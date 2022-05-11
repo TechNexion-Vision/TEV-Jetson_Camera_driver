@@ -11,7 +11,6 @@
 #include <media/v4l2-device.h>
 #include <media/v4l2-subdev.h>
 #include <media/camera_common.h>
-#define DEBUG
 #include "tevi_ap1302_mode_tbls.h"
 #include "otp_flash.h"
 
@@ -79,30 +78,6 @@ static int sensor_i2c_read_16b(struct i2c_client *client, u16 reg, u16 *value)
 	return 0;
 }
 
-// static int sensor_i2c_write_8b(struct i2c_client *client, u8 reg, u8 val)
-// {
-// 	struct i2c_msg msg;
-// 	u8 buf[2];
-// 	int ret;
-
-// 	buf[0] = reg;
-// 	buf[1] = val;
-
-// 	msg.addr = client->addr;
-// 	msg.flags = client->flags;
-// 	msg.buf = buf;
-// 	msg.len = sizeof(buf);
-
-// 	ret = i2c_transfer(client->adapter, &msg, 1);
-// 	if (ret < 0)
-// 	{
-// 		dev_err(&client->dev, "i2c transfer error. addr=%x, reg=%x, val=%x\n", client->addr, reg, val);
-// 		return -EIO;
-// 	}
-
-// 	return 0;
-// }
-
 static int sensor_i2c_write_16b(struct i2c_client *client, u16 reg, u16 val)
 {
 	struct i2c_msg msg;
@@ -153,20 +128,6 @@ static int sensor_i2c_write_bust(struct i2c_client *client, u8 *buf, size_t len)
 	return 0;
 }
 
-// static int sensor_extend_gpio_setting(struct i2c_client *client)
-// {
-// 	int ret;
-// 	u8 old_addr = client->addr;
-
-// 	dev_dbg(&client->dev, "%s()\n", __func__);
-// 	client->addr = 0x21; //TN238 extend gpio chip i2c address
-// 	ret = sensor_i2c_write_8b(client, 3, 0xFA);
-// 	ret = sensor_i2c_write_8b(client, 1, 1);
-// 	client->addr = old_addr;
-
-// 	return ret;
-// }
-
 static const struct regmap_config sensor_regmap_config = {
 	.reg_bits = 16,
 	.val_bits = 8,
@@ -199,9 +160,7 @@ static int sensor_standby(struct i2c_client *client, int enable)
 	dev_dbg(&client->dev, "%s():enable=%d\n", __func__, enable);
 
 	if (enable == 1) {
-		// sensor_i2c_write_16b(client, 0xf056, 0x0000);
 		sensor_i2c_write_16b(client, 0x601a, 0x8140);
-		// sensor_i2c_write_16b(client, 0x601a, 0x140);
 		for (timeout = 0 ; timeout < 50 ; timeout ++) {
 			usleep_range(9000, 10000);
 			sensor_i2c_read_16b(client, 0x601a, &v);
@@ -209,10 +168,6 @@ static int sensor_standby(struct i2c_client *client, int enable)
 				break;
 		}
 		if (timeout < 50) {
-			// Reset ADV_GPIO in Advanced Registers
-			// sensor_i2c_write_16b(client, 0xF038, 0x002A);
-			// sensor_i2c_write_16b(client, 0xF03A, 0x0000);
-			// sensor_i2c_write_16b(client, 0xE002, 0x0490);
 			sensor_i2c_write_16b(client, 0xFFFE, 1);
 			msleep(100);
 		} else {
@@ -485,11 +440,10 @@ static int sensor_start_streaming(struct tegracam_device *tc_dev)
 
 	if (ret == 0) {
 		int fps = *ap1302_sensor_table[priv->selected_sensor].frmfmt[priv->selected_mode].framerates;
-		int frame_reg = fps << 8;
-		dev_dbg(tc_dev->dev, "%s() width=%d, height=%d, frame_reg=0x%04x\n", __func__, 
+		dev_dbg(tc_dev->dev, "%s() width=%d, height=%d, fps=%d\n", __func__, 
 			ap1302_sensor_table[priv->selected_sensor].frmfmt[priv->selected_mode].size.width, 
 			ap1302_sensor_table[priv->selected_sensor].frmfmt[priv->selected_mode].size.height, 
-			frame_reg);
+			fps);
 		sensor_i2c_write_16b(tc_dev->client, 0x1184, 1); //ATOMIC
 		//VIDEO_WIDTH
 		sensor_i2c_write_16b(tc_dev->client, 0x2000,
@@ -497,9 +451,8 @@ static int sensor_start_streaming(struct tegracam_device *tc_dev)
 		//VIDEO_HEIGHT
 		sensor_i2c_write_16b(tc_dev->client, 0x2002,
 				     ap1302_sensor_table[priv->selected_sensor].frmfmt[priv->selected_mode].size.height);
-		// framerates
-		// sensor_i2c_write_16b(tc_dev->client, 0x2020, 0x1e00); //VIDEO_MAX_FPS
-		sensor_i2c_write_16b(tc_dev->client, 0x2020, frame_reg); //VIDEO_MAX_FPS
+		// VIDEO_MAX_FPS
+		sensor_i2c_write_16b(tc_dev->client, 0x2020, fps << 8);
 		sensor_i2c_write_16b(tc_dev->client, 0x1184, 0xb); //ATOMIC
 	}
 
@@ -626,12 +579,11 @@ static int sensor_board_setup(struct sensor_obj *priv)
 	struct camera_common_pdata *pdata = s_data->pdata;
 	struct camera_common_power_rail *pw = s_data->power;
 	struct device *dev = s_data->dev;
-	// struct device_node *np = dev->of_node;
 	int data_lanes;
 	int continuous_clock;
+	bool has_rpi = false;
 	int i;
 	u16 chipid = 0;
-	// int gpio1, gpio2;
 	int err = 0;
 
 	if (pdata->mclk_name) {
@@ -652,18 +604,28 @@ static int sensor_board_setup(struct sensor_obj *priv)
 	gpio_set_value_cansleep(pw->pwdn_gpio, 1);
 	msleep(200);
 
-	//To make tevi-ap1302 work on jetson nano platform,
-	//it must be equipped with TN238 adapter.
-	//Some gpio controll pin of tevi-ap1302 assign to this chip
-	dev_dbg(dev, "initial extend gpio chip...\n");
-	// err = sensor_extend_gpio_setting(priv->tc_dev->client);
-	// gpio_set_value_cansleep(priv->exp_gpio, 1);
-	// gpio_set_value_cansleep(priv->info_gpio, 1);
-	// if (err) {
-	// 	dev_err(dev, "%s() error initial extend gpio chip\n",
-	// 		__func__);
-	// 	goto err_reg_probe;
-	// }
+	has_rpi = of_property_read_bool(dev->of_node, "has-rpi-adapter");
+	if(has_rpi) {
+		dev_dbg(dev, "initial extend gpio chip for RPI-Adapter...\n");
+		priv->exp_gpio = of_get_named_gpio(dev->of_node, "exp-gpios", 0);
+		if (priv->exp_gpio < 0) {
+			if (priv->exp_gpio == -EPROBE_DEFER)
+				err = -EPROBE_DEFER;
+			dev_err(dev, "exp-gpios not found\n");
+			goto err_reg_probe;
+		}
+		priv->info_gpio = of_get_named_gpio(dev->of_node, "info-gpios", 0);
+		if (priv->info_gpio < 0) {
+			if (priv->info_gpio == -EPROBE_DEFER)
+				err = -EPROBE_DEFER;
+			dev_err(dev, "info-gpios not found\n");
+			goto err_reg_probe;
+		}
+
+		gpio_set_value_cansleep(priv->exp_gpio, 1);
+		gpio_set_value_cansleep(priv->info_gpio, 1);
+	}
+
 	gpio_set_value_cansleep(pw->reset_gpio, 1);
 	msleep(300);
 
@@ -714,31 +676,31 @@ static int sensor_board_setup(struct sensor_obj *priv)
 	dev_info(dev, "selected_sensor:%d, sensor_name:%s\n", i, priv->header->product_name);
 
 	switch(priv->selected_sensor){
-	case 0:
+	case TEVI_AP1302_AR0144:
 		s_data->frmfmt = ar0144_frmfmt;
 		s_data->numfmts = ARRAY_SIZE(ar0144_frmfmt);
 		break;
-	case 1:
+	case TEVI_AP1302_AR0234:
 		s_data->frmfmt = ar0234_frmfmt;
 		s_data->numfmts = ARRAY_SIZE(ar0234_frmfmt);
 		break;
-	case 2:
-	case 3:
+	case TEVI_AP1302_AR0521:
+	case TEVI_AP1302_AR0522:
 		s_data->frmfmt = ar0521_frmfmt;
 		s_data->numfmts = ARRAY_SIZE(ar0521_frmfmt);
 		break;
-	case 4:
+	case TEVI_AP1302_AR0821:
 		s_data->frmfmt = ar0821_frmfmt;
 		s_data->numfmts = ARRAY_SIZE(ar0821_frmfmt);
 		break;
-	case 5:
+	case TEVI_AP1302_AR1335:
 		s_data->frmfmt = ar1335_frmfmt;
 		s_data->numfmts = ARRAY_SIZE(ar1335_frmfmt);
 		break;
 	default:
 		s_data->frmfmt = sensor_frmfmt;
 		s_data->numfmts = ARRAY_SIZE(sensor_frmfmt);
-	break;
+		break;
 	}
 
 	if(sensor_load_bootdata(priv) != 0) {
@@ -747,7 +709,6 @@ static int sensor_board_setup(struct sensor_obj *priv)
 		goto err_reg_probe;
 	}
 
-	////set something reference from DevX tool register log
 	//cntx select 'Video'
 	sensor_i2c_write_16b(priv->tc_dev->client, 0x1184, 1); //ATOMIC
 	sensor_i2c_write_16b(priv->tc_dev->client, 0x1000, 0); //CTRL
@@ -765,7 +726,7 @@ static int sensor_board_setup(struct sensor_obj *priv)
 			     0x10 | (continuous_clock << 5) | (data_lanes)); //VIDEO_HINF_CTRL
 	sensor_i2c_write_16b(priv->tc_dev->client, 0x1184, 0xb); //ATOMIC
 
-	////let ap1302 go to standby mode
+	//let ap1302 go to standby mode
 	return sensor_standby(priv->tc_dev->client, 1);
 
 err_reg_probe:
@@ -796,7 +757,6 @@ static int sensor_probe(struct i2c_client *client, const struct i2c_device_id *i
 	struct device *dev = &client->dev;
 	struct tegracam_device *tc_dev;
 	struct sensor_obj *priv;
-	// struct device_node *np = dev->of_node;
 	int err;
 
 	dev_info(dev, "probe tevi-ap1302 START...\n");
@@ -831,21 +791,6 @@ static int sensor_probe(struct i2c_client *client, const struct i2c_device_id *i
 	priv->s_data = tc_dev->s_data;
 	priv->subdev = &tc_dev->s_data->subdev;
 	tegracam_set_privdata(tc_dev, (void *)priv);
-
-	// priv->exp_gpio = of_get_named_gpio(np, "exp-gpios", 0);
-	// if (priv->exp_gpio < 0) {
-	// 	if (priv->exp_gpio == -EPROBE_DEFER)
-	// 		err = -EPROBE_DEFER;
-	// 	dev_err(dev, "exp-gpios not found\n");
-	// 	return err;
-	// }
-	// priv->info_gpio = of_get_named_gpio(np, "info-gpios", 0);
-	// if (priv->info_gpio < 0) {
-	// 	if (priv->info_gpio == -EPROBE_DEFER)
-	// 		err = -EPROBE_DEFER;
-	// 	dev_err(dev, "info-gpios not found\n");
-	// 	return err;
-	// }
 
 	err = sensor_board_setup(priv);
 	if (err) {

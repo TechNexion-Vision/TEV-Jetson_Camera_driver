@@ -12,6 +12,16 @@
  *		int	mode;  // number depend on dts mode list
  * };
  */
+enum
+{
+	TEVI_AP1302_AR0144 = 0,
+	TEVI_AP1302_AR0234,
+	TEVI_AP1302_AR0521,
+	TEVI_AP1302_AR0522,
+	TEVI_AP1302_AR0821,
+	TEVI_AP1302_AR1335,
+};
+
 static const int __20fps = 20;
 static const int __30fps = 30;
 static const int __60fps = 60;
