@@ -19,16 +19,6 @@ config VIDEO_VIZION_LINK
  	  To compile this driver as a module, choose M here: the module
  	  will be called tevi-ar0144.
 
-#config VIDEO_TEVI_AR0521
-# 	tristate "TEVI-AR0521 camera sensor support"
-# 	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
-# 	---help---
-# 	  This is a Video4Linux2 sensor-level driver for the Onsemi
-# 	  AR0521 camera sensor
-
-#	  To compile this driver as a module, choose M here: the module
-# 	  will be called tevi-ar0521.
-
 config VIDEO_TEVI_AP1302
 	tristate "TEVI-AP1302 camera sensor support"
 	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
