@@ -482,12 +482,13 @@ static int vh_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	dev_info(&client->dev, "addr=0x%x\n", addr);
 	obj->i2c_client->addr = addr;
 
-	// obj->pdb_gpio = devm_gpiod_get(&client->dev, "pdb", GPIOD_OUT_LOW);
-	// if (IS_ERR(obj->pdb_gpio)) {
-	// 	dev_err(&client->dev,
-	// 		"Failed to get gpio pin setting 'pdb'\n");
-	// 	return -EINVAL;
-	// }
+	obj->pdb_gpio = devm_gpiod_get(&client->dev, "pdb", GPIOD_OUT_LOW);
+	if (IS_ERR(obj->pdb_gpio)) {
+		dev_err(&client->dev,
+			"Failed to get gpio pin setting 'pdb'\n");
+		dev_err(&client->dev,
+			"Bypass  gpio pin 'pdb'\n");
+	}
 
 	if (vh_is_exist(obj) != 0) {
 		dev_err(&client->dev,
