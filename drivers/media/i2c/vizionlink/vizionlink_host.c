@@ -24,8 +24,8 @@ static struct __reg8b_v __9096x_i2c_setting [] = {
 	{.reg = 0x07, .value = 0xFE}, //BCC Watchdog Control
 	{.reg = 0x08, .value = 0x1C}, //I2C Control 1
 	{.reg = 0x09, .value = 0x10}, //I2C Control 2
-	{.reg = 0x0A, .value = 0x7A}, //SCL High Time
-	{.reg = 0x0B, .value = 0x7A}, //SCL Low Time
+	{.reg = 0x0A, .value = 0x06}, //SCL High Time
+	{.reg = 0x0B, .value = 0x0C}, //SCL Low Time
 	{.reg = 0x0D, .value = 0xB9}, //IO_CTL
 
 	{.reg = 0x32, .value = 0x01}, //CSI_PORT_SEL
@@ -63,6 +63,9 @@ static struct __reg8b_v __9096x_i2c_setting [] = {
 	{.reg = 0x1B, .value = 0x61}, //FS_LOW_TIME_1
 	{.reg = 0x1C, .value = 0xA0}, //FS_LOW_TIME_0
 	{.reg = 0x18, .value = 0x01}, //FS_CTL
+	
+	{.reg = 0x7C, .value = 0x20}, //
+	{.reg = 0xB0, .value = 0x1C}, //IND_ACC_CTL
 };
 
 static int __i2c_read(struct i2c_client *client, u8 reg, u8 *val, u8 size)
@@ -139,10 +142,10 @@ static int vh_init(struct vh_st *this)
 	dev_info(dev, "%s\n", __func__);
 
 	//9096x Digital Reset
-	// err = __i2c_write(this->i2c_client, 1, 3);
-	// if (err != 0)
-	// 	return -EIO;
-	// msleep(20);
+	 err = __i2c_write(this->i2c_client, 0x01, 0x03);
+	 if (err != 0)
+	 	return -EIO;
+	 msleep(20);
 
 	for (i = 0 ; i < ARRAY_SIZE(__9096x_i2c_setting) ; i++) {
 		err = __i2c_write(this->i2c_client,
