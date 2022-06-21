@@ -13,3 +13,5 @@ TechNexion TEVI Camera on nVidia Jetson DevKit
 |nVidia Jetson Xavier NX| TEVI-OV5640 <br> TEVI-AR0521/0522 <br> TEVI-AR0144 <br> TEVI-AR0234 <br> TEVI-AR0821/0822|
 
 ## WIKI pages
+[TechNexion cameras with Nvidia EVK guide]([https://developer.technexion.com/docs/1](https://developer.technexion.com/docs/tevi-arxxxx-cameras-on-nvidia-jetson-nano))
+[TechNexion Nvidia products guide](https://developer.technexion.com/docs/1)
