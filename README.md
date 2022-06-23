@@ -5,7 +5,7 @@
 
 ## Introduction
 
-[TechNexion embedded Vision solutions](https://www.technexion.com/products/embedded-vision/camera-sensors) provide embedded system developers access to high-performance, industrial-grade camera solutions to accelerate their time to market for embedded vision projects.
+[TechNexion embedded Vision solutions](https://www.technexion.com/products/embedded-vision/) provide embedded system developers access to high-performance, industrial-grade camera solutions to accelerate their time to market for embedded vision projects.
 
 ## NVIDIA Jetson EVK Support List
 
