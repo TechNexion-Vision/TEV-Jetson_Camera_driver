@@ -2,29 +2,16 @@
 
 ## Introduction
 
-TechNexion embedded Vision solutions provide embedded system developers access to high-performance, industrial-grade camera solutions to accelerate their time to market for embedded vision projects.
+[TechNexion embedded Vision solutions](https://www.technexion.com/products/embedded-vision/camera-sensors) provide embedded system developers access to high-performance, industrial-grade camera solutions to accelerate their time to market for embedded vision projects.
 
-<style>
+## Camera Support List
 
-|              | NVIDIA Jetson Xavier NX      | NVIDIA Jetson Nano |
-| :----------: | ---------------------------- | ------------------ |
-| Support List | TEVI-OV5640<br />TEVI-AR0521 |                    |
-
-</style>
-
-
-Product page:
- --------
-[TechNexion Camera Sensors](https://www.technexion.com/products/embedded-vision/camera-sensors)
-
-## Support Hardware
---------
-|nVidia Jetson DevKit| Support sensor |
-|:-:|:-:|
-|nVidia Jetson Nano| TEVI-OV5640 <br> TEVI-AR0521/0522 <br> TEVI-AR0144 <br> TEVI-AR0234 <br> TEVI-AR0821/0822|
-|nVidia Jetson Xavier NX| TEVI-OV5640 <br> TEVI-AR0521/0522 <br> TEVI-AR0144 <br> TEVI-AR0234 <br> TEVI-AR0821/0822|
+|              | NVIDIA Jetson Xavier NX                                      | NVIDIA Jetson Nano                                           |
+| :----------: | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| Support List | TEVI-OV5640<br />TEVI-AR0521<br />TEVI-AR0522<br />TEVI-AR0144<br />TEVI-AR0234<br />TEVI-AR0821<br />TEVI-AR0822 | TEVI-OV5640<br />TEVI-AR0521<br />TEVI-AR0522<br />TEVI-AR0144<br />TEVI-AR0234<br />TEVI-AR0821<br />TEVI-AR0822 |
 
 ## WIKI pages
+
 [TechNexion cameras with Nvidia EVK guide](https://developer.technexion.com/docs/tevi-arxxxx-cameras-on-nvidia-jetson-nano)
 
 [TechNexion Nvidia products guide](https://developer.technexion.com/docs/1)
