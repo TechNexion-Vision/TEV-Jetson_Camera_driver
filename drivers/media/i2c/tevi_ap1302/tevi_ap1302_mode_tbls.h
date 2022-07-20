@@ -24,6 +24,7 @@ enum
 
 static const int __20fps = 20;
 static const int __30fps = 30;
+static const int __40fps = 40;
 static const int __60fps = 60;
 static const struct camera_common_frmfmt sensor_frmfmt[] = {
 	{{1280, 720}, &__60fps, 1, 0, 0},
@@ -40,13 +41,13 @@ static const struct camera_common_frmfmt ar0234_frmfmt[] = {
 	{{1920, 1200}, &__60fps, 1, 0, 2},
 };
 static const struct camera_common_frmfmt ar0521_frmfmt[] = {
-	{{1280, 720}, &__30fps, 1, 0, 0},
-	{{1920, 1080}, &__30fps, 1, 0, 1},
-	{{2592, 1944}, &__20fps, 1, 0, 2},
+	{{1280, 720}, &__60fps, 1, 0, 0},
+	{{1920, 1080}, &__60fps, 1, 0, 1},
+	{{2592, 1944}, &__30fps, 1, 0, 2},
 };
 static const struct camera_common_frmfmt ar0821_frmfmt[] = {
-	{{1280, 720}, &__30fps, 1, 0, 0},
-	{{1920, 1080}, &__30fps, 1, 0, 1},
+	{{1280, 720}, &__40fps, 1, 0, 0},
+	{{1920, 1080}, &__40fps, 1, 0, 1},
 	{{2560, 1440}, &__20fps, 1, 0, 2},
 	{{3840, 2160}, &__20fps, 1, 0, 3},
 };

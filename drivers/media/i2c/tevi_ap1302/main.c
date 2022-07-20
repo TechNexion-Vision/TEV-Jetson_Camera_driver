@@ -1,3 +1,4 @@
+#define DEBUG           /* Enable dev_dbg */
 #include <linux/slab.h>
 #include <linux/uaccess.h>
 #include <linux/gpio.h>
@@ -118,10 +119,12 @@ static int sensor_i2c_write_bust(struct i2c_client *client, u8 *buf, size_t len)
 	msg.buf = buf;
 	msg.len = len;
 
+	dev_err(&client->dev, "bust i2c transfer : addr=0x%x, buf=0x%x, len=%zu\n", client->addr, *buf, len);
+
 	ret = i2c_transfer(client->adapter, &msg, 1);
 	if (ret < 0)
 	{
-		dev_err(&client->dev, "i2c transfer error.\n");
+		dev_err(&client->dev, "bust i2c transfer error. addr=0x%x, buf=0x%x, len=%zu\n", client->addr, *buf, len);
 		return -EIO;
 	}
 
@@ -153,7 +156,7 @@ static struct tegracam_ctrl_ops sensor_ctrl_ops = {
 	.set_group_hold = sensor_set_group_hold,
 };
 
-static int sensor_standby(struct i2c_client *client, int enable)
+static int set_standby_mode_rel419(struct i2c_client *client, int enable)
 {
 	u16 v = 0;
 	int timeout;
@@ -222,6 +225,47 @@ static int sensor_standby(struct i2c_client *client, int enable)
 			usleep_range(9000, 10000);
 			sensor_i2c_read_16b(client, 0x601a, &v);
 			if ((v & 0x8040) == 0x8040)
+				break;
+		}
+		if (timeout >= 100) {
+			dev_err(&client->dev, "timeout: line[%d]v=%x\n", __LINE__, v);
+			return -EINVAL;
+		}
+
+		dev_dbg(&client->dev, "sensor wake up\n");
+	}
+
+	return 0;
+}
+
+static int sensor_standby(struct i2c_client *client, int enable)
+{
+	u16 v = 0;
+	int timeout;
+	u16 checksum = 0;
+	dev_dbg(&client->dev, "%s():enable=%d\n", __func__, enable);
+
+	sensor_i2c_read_16b(client, 0x6134, &checksum);
+
+	if(checksum != 0xFFFF){
+		return set_standby_mode_rel419(client, enable); // standby for rel419
+	}
+
+	if (enable == 1) {
+		sensor_i2c_write_16b(client, 0x601a, 0x0180);
+		for (timeout = 0 ; timeout < 50 ; timeout ++) {
+			usleep_range(9000, 10000);
+			sensor_i2c_read_16b(client, 0x601a, &v);
+			if ((v & 0x200) == 0x200)
+				break;
+		}
+	}  else {
+		sensor_i2c_write_16b(client, 0x601a, 0x0380);
+		usleep_range(1000, 2000);
+		for (timeout = 0 ; timeout < 100 ; timeout ++) {
+			usleep_range(9000, 10000);
+			sensor_i2c_read_16b(client, 0x601a, &v);
+			if ((v & 0x200) == 0)
 				break;
 		}
 		if (timeout >= 100) {
@@ -506,7 +550,7 @@ static int sensor_load_bootdata(struct sensor_obj *priv)
 	bootdata_temp_area[0] = cpu_to_be16(BOOT_DATA_START_REG);
 	pll_len = tevi_ap1302_otp_flash_get_pll_section(priv->otp_flash_instance,
 					    (u8 *)(&bootdata_temp_area[1]));
-	dev_dbg(dev, "load pll data of length [%zu] into register [%x]\n",
+	dev_dbg(dev, "load pll data of length [%zu] into register [0x%x]\n",
 		pll_len, BOOT_DATA_START_REG);
 	sensor_i2c_write_bust(priv->tc_dev->client, (u8 *)bootdata_temp_area, pll_len + 2);
 	sensor_i2c_write_16b(priv->tc_dev->client, 0x6002, 2);
@@ -517,7 +561,7 @@ static int sensor_load_bootdata(struct sensor_obj *priv)
 	len = tevi_ap1302_otp_flash_read(priv->otp_flash_instance,
 			     (u8 *)(&bootdata_temp_area[1]),
 			     pll_len, len_each_time * 4 - pll_len);
-	dev_dbg(dev, "load data of length [%zu] into register [%zx]\n",
+	dev_dbg(dev, "load data of length [%zu] into register [0x%zx]\n",
 		len, BOOT_DATA_START_REG + pll_len);
 	sensor_i2c_write_bust(priv->tc_dev->client, (u8 *)bootdata_temp_area, len + 2);
 	i = index = pll_len + len;
