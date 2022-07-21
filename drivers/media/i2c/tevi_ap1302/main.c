@@ -529,13 +529,13 @@ static int sensor_load_bootdata(struct sensor_obj *priv)
 {
 	struct device *dev = priv->tc_dev->dev;
 	int index = 0;
-	size_t len = 0;
-	size_t pll_len = 0;
+
 	u16 otp_data;
 	u16 *bootdata_temp_area;
 	u16 checksum;
 	int i;
 	const int len_each_time = 1024;
+	size_t len = len_each_time;
 
 	bootdata_temp_area = devm_kzalloc(dev,
 					  len_each_time * 4 + 2,
@@ -546,27 +546,7 @@ static int sensor_load_bootdata(struct sensor_obj *priv)
 	}
 
 	checksum = tevi_ap1302_otp_flash_get_checksum(priv->otp_flash_instance);
-	//load pll
-	bootdata_temp_area[0] = cpu_to_be16(BOOT_DATA_START_REG);
-	pll_len = tevi_ap1302_otp_flash_get_pll_section(priv->otp_flash_instance,
-					    (u8 *)(&bootdata_temp_area[1]));
-	dev_dbg(dev, "load pll data of length [%zu] into register [0x%x]\n",
-		pll_len, BOOT_DATA_START_REG);
-	sensor_i2c_write_bust(priv->tc_dev->client, (u8 *)bootdata_temp_area, pll_len + 2);
-	sensor_i2c_write_16b(priv->tc_dev->client, 0x6002, 2);
-	msleep(1);
 
-	//load bootdata part1
-	bootdata_temp_area[0] = cpu_to_be16(BOOT_DATA_START_REG + pll_len);
-	len = tevi_ap1302_otp_flash_read(priv->otp_flash_instance,
-			     (u8 *)(&bootdata_temp_area[1]),
-			     pll_len, len_each_time * 4 - pll_len);
-	dev_dbg(dev, "load data of length [%zu] into register [0x%zx]\n",
-		len, BOOT_DATA_START_REG + pll_len);
-	sensor_i2c_write_bust(priv->tc_dev->client, (u8 *)bootdata_temp_area, len + 2);
-	i = index = pll_len + len;
-
-	//load bootdata ronaming
 	while(len != 0) {
 		while(i < BOOT_DATA_WRITE_LEN) {
 			bootdata_temp_area[0] =
