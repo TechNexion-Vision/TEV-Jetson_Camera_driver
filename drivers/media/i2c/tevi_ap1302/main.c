@@ -1,4 +1,3 @@
-#define DEBUG           /* Enable dev_dbg */
 #include <linux/slab.h>
 #include <linux/uaccess.h>
 #include <linux/gpio.h>
@@ -25,7 +24,6 @@ static const u32 ctrl_cid_list[] = {
 	TEGRA_CAMERA_CID_FRAME_RATE,
 	TEGRA_CAMERA_CID_SENSOR_MODE_ID,
 };
-
 struct sensor_obj {
 	struct v4l2_subdev		*subdev;
 	struct camera_common_data	*s_data;
@@ -119,12 +117,12 @@ static int sensor_i2c_write_bust(struct i2c_client *client, u8 *buf, size_t len)
 	msg.buf = buf;
 	msg.len = len;
 
-	dev_err(&client->dev, "bust i2c transfer : addr=0x%x, buf=0x%x, len=%zu\n", client->addr, *buf, len);
+	dev_dbg(&client->dev, "bust i2c transfer : addr=0x%x, buf=0x%x, len=%zu\n", client->addr, *buf, len);
 
 	ret = i2c_transfer(client->adapter, &msg, 1);
 	if (ret < 0)
 	{
-		dev_err(&client->dev, "bust i2c transfer error. addr=0x%x, buf=0x%x, len=%zu\n", client->addr, *buf, len);
+		dev_dbg(&client->dev, "bust i2c transfer error. addr=0x%x, buf=0x%x, len=%zu\n", client->addr, *buf, len);
 		return -EIO;
 	}
 
