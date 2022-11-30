@@ -1,4 +1,4 @@
-#define DEBUG
+//#define DEBUG
 #include <linux/slab.h>
 #include <linux/uaccess.h>
 #include <linux/gpio.h>
@@ -505,6 +505,7 @@ static int sensor_power_get(struct tegracam_device *tc_dev)
 	if (err < 0) {
 		dev_err(dev, "%s() unable to request power_gpio (%d)\n",
 			__func__, err);
+		err = 0;  // Pass Error
 		goto done;
 	}
 
@@ -513,6 +514,7 @@ static int sensor_power_get(struct tegracam_device *tc_dev)
 	if (err < 0) {
 		dev_err(dev, "%s() unable to request reset_gpio (%d)\n",
 			__func__, err);
+		err = 0;  // Pass Error
 		goto done;
 	}
 
@@ -703,7 +705,8 @@ static int sensor_load_bootdata(struct sensor_obj *priv)
 	u16 otp_data;
 	u16 *bootdata_temp_area;
 	u16 checksum;
-	int i;
+	int i, ret;
+	int count = 0;
 	const int len_each_time = 1024;
 
 	bootdata_temp_area = devm_kzalloc(dev,
@@ -722,7 +725,11 @@ static int sensor_load_bootdata(struct sensor_obj *priv)
 					    (u8 *)(&bootdata_temp_area[1]));
 	dev_dbg(dev, "load pll data of length [%zu] into register [%x]\n",
 		pll_len, BOOT_DATA_START_REG);
-	__i2c_write_bust(priv->tc_dev->client, (u8 *)bootdata_temp_area, pll_len + 2);
+	do{
+		count++;
+		ret = __i2c_write_bust(priv->tc_dev->client, (u8 *)bootdata_temp_area, pll_len + 2);
+		if(ret == 0) { count = 0; break;}
+	} while(count <= 10);
 	__i2c_write_16b(priv->tc_dev->client, 0x6002, 2);
 	msleep(1);
 
@@ -733,7 +740,12 @@ static int sensor_load_bootdata(struct sensor_obj *priv)
 			     pll_len, len_each_time - pll_len);
 	dev_dbg(dev, "load data of length [%zu] into register [%zx]\n",
 		len, BOOT_DATA_START_REG + pll_len);
-	__i2c_write_bust(priv->tc_dev->client, (u8 *)bootdata_temp_area, len + 2);
+	
+	do{
+		count++;
+		ret = __i2c_write_bust(priv->tc_dev->client, (u8 *)bootdata_temp_area, len + 2);
+		if(ret == 0) { count = 0; break;}
+	} while(count <= 10);
 	i = index = pll_len + len;
 
 	//load bootdata ronaming
@@ -753,9 +765,14 @@ static int sensor_load_bootdata(struct sensor_obj *priv)
 				"load ronaming data of length [%zu] into register [%x]\n",
 				len,
 				BOOT_DATA_START_REG + i);
-			__i2c_write_bust(priv->tc_dev->client,
+			
+			do{
+				count++;
+				ret = __i2c_write_bust(priv->tc_dev->client,
 					 (u8 *)bootdata_temp_area,
 					 len + 2);
+				if(ret == 0) { count = 0; break;}
+			} while(count <= 10);
 			index += len;
 			i += len_each_time;
 		}
@@ -805,7 +822,7 @@ static int sensor_board_setup(struct sensor_obj *priv)
 	if (!(pw->reset_gpio && pw->pwdn_gpio)) {
 		dev_err(dev, "error the power and reset gpio define\n");
 		err = -EIO;
-		goto done;
+		goto pass;
 	}
 
 	gpio_set_value_cansleep(pw->reset_gpio, 0);
@@ -823,8 +840,9 @@ static int sensor_board_setup(struct sensor_obj *priv)
 	// 	goto err_reg_probe;
 	// }
 	gpio_set_value_cansleep(pw->reset_gpio, 1);
+pass:
 	msleep(300);
-	
+
 	err = __i2c_read_16b(priv->tc_dev->client, 0, &chipid);
 	if (err) {
 		dev_err(dev, "%s() error during i2c read probe (%d)\n",
@@ -868,6 +886,7 @@ static int sensor_board_setup(struct sensor_obj *priv)
 	//non-continuous clock,2 lane
 	__i2c_write_16b(priv->tc_dev->client, 0x4030, 0x12); //VIDEO_HINF_CTRL
 	//__i2c_write_16b(priv->tc_dev->client, 0x4014, 0); //VIDEO_SENSOR_MODE
+	__i2c_write_16b(priv->tc_dev->client, 0x100C, 0x03); //VIDEO_HINF_CTRL
 	__i2c_write_16b(priv->tc_dev->client, 0x1184, 0xb); //ATOMIC
 	////let ap1302 go to standby mode
 	return sensor_standby(priv->tc_dev->client, 1);
