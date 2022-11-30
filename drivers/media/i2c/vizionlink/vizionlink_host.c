@@ -24,8 +24,8 @@ static struct __reg8b_v __9096x_i2c_setting [] = {
 	{.reg = 0x07, .value = 0xFE}, //BCC Watchdog Control
 	{.reg = 0x08, .value = 0x1C}, //I2C Control 1
 	{.reg = 0x09, .value = 0x10}, //I2C Control 2
-	{.reg = 0x0A, .value = 0x7A}, //SCL High Time
-	{.reg = 0x0B, .value = 0x7A}, //SCL Low Time
+	{.reg = 0x0A, .value = 0x06}, //SCL High Time
+	{.reg = 0x0B, .value = 0x0C}, //SCL Low Time
 	{.reg = 0x0D, .value = 0xB9}, //IO_CTL
 
 	{.reg = 0x32, .value = 0x01}, //CSI_PORT_SEL
@@ -46,13 +46,13 @@ static struct __reg8b_v __9096x_i2c_setting [] = {
 	{.reg = 0x6D, .value = 0x7C}, //PORT_CONFIG
 
 	{.reg = 0x4C, .value = 0x24}, //FPD3_PORT_SEL,Port 2
-	{.reg = 0x72, .value = 0xaa}, //CSI_VC_MAP
+	{.reg = 0x72, .value = 0xAA}, //CSI_VC_MAP
 	{.reg = 0x6E, .value = 0xAA}, //BC_GPIO_CTL0
 	{.reg = 0x58, .value = 0x5E}, //BCC_CONFIG
 	{.reg = 0x6D, .value = 0x7C}, //PORT_CONFIG
 
 	{.reg = 0x4C, .value = 0x38}, //FPD3_PORT_SEL,Port 3
-	{.reg = 0x72, .value = 0xff}, //CSI_VC_MAP
+	{.reg = 0x72, .value = 0xFF}, //CSI_VC_MAP
 	{.reg = 0x6E, .value = 0xAA}, //BC_GPIO_CTL0
 	{.reg = 0x58, .value = 0x5E}, //BCC_CONFIG
 	{.reg = 0x6D, .value = 0x7C}, //PORT_CONFIG
@@ -198,7 +198,7 @@ static int vh_polling_connect(struct vh_st *this)
 {
 	int state_flag = 0;
 	u8 v = 0;
-	int retry_time = 100;
+	int retry_time = 20;
 	dev_info(&this->i2c_client->dev, "%s\n", __func__);
 
 	while (state_flag != -1 && retry_time != 0) {
@@ -440,6 +440,7 @@ static int vh_configure_des_csi(struct vh_st *this)
 	temp2 |= 1;
 	__i2c_write(this->i2c_client, 0x33, temp2);
 	//0x34 //Enable CSI-2 Periodic Calibration (if desired) in the CSI_CTL2 register
+	// __i2c_write(this->i2c_client, 0x21, 0x14);
 	//0x20 //Enable Forwarding for assigned ports in the FWD_CTL1 register
 	__i2c_read(this->i2c_client, 0x20, &temp2, 1);
 	temp2 &= ~(1 << (this->connect_port + 4));
