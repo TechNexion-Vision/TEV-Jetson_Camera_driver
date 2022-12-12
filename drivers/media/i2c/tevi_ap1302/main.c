@@ -1,3 +1,4 @@
+// #define DEBUG           /* Enable dev_dbg */
 #include <linux/slab.h>
 #include <linux/uaccess.h>
 #include <linux/gpio.h>
@@ -66,7 +67,7 @@ static int sensor_i2c_read_16b(struct i2c_client *client, u16 reg, u16 *value)
 	ret = sensor_i2c_read(client, reg, v, 2);
 
 	if (unlikely(ret < 0)) {
-		dev_err(&client->dev, "i2c transfer error. addr=%x, reg=%x, val=%x\n", client->addr, reg, *value);
+		dev_dbg(&client->dev, "i2c transfer error. addr=%x, reg=%x, val=%x\n", client->addr, reg, *value);
 		return ret;
 	}
 
@@ -81,7 +82,7 @@ static int sensor_i2c_write_16b(struct i2c_client *client, u16 reg, u16 val)
 {
 	struct i2c_msg msg;
 	u8 buf[4];
-	int ret;
+	int retry_tmp = 0;
 
 	buf[0] = reg >> 8;
 	buf[1] = reg & 0xff;
@@ -93,20 +94,25 @@ static int sensor_i2c_write_16b(struct i2c_client *client, u16 reg, u16 val)
 	msg.buf = buf;
 	msg.len = sizeof(buf);
 
-	ret = i2c_transfer(client->adapter, &msg, 1);
-	if (ret < 0)
+	while((i2c_transfer(client->adapter, &msg, 1)) < 0)
 	{
-		dev_err(&client->dev, "i2c transfer error. addr=%x, reg=%x, val=%x\n", client->addr, reg, val);
-		return -EIO;
-	}
+		retry_tmp++;
+		dev_dbg(&client->dev, "i2c transfer retry:%d.\n", retry_tmp);
+		dev_dbg(&client->dev, "write 16b reg:%x val:%x.\n", reg, val);
 
+		if (retry_tmp > 50)
+		{
+			dev_err(&client->dev, "i2c transfer error\n");
+			return -EIO;
+		}
+	}
 	return 0;
 }
 
 static int sensor_i2c_write_bust(struct i2c_client *client, u8 *buf, size_t len)
 {
 	struct i2c_msg msg;
-	int ret;
+	int retry_tmp = 0;
 
 	if (len == 0) {
 		return 0;
@@ -119,11 +125,19 @@ static int sensor_i2c_write_bust(struct i2c_client *client, u8 *buf, size_t len)
 
 	dev_dbg(&client->dev, "bust i2c transfer : addr=0x%x, buf=0x%x, len=%zu\n", client->addr, *buf, len);
 
-	ret = i2c_transfer(client->adapter, &msg, 1);
-	if (ret < 0)
+
+	while((i2c_transfer(client->adapter, &msg, 1)) < 0)
 	{
-		dev_dbg(&client->dev, "bust i2c transfer error. addr=0x%x, buf=0x%x, len=%zu\n", client->addr, *buf, len);
-		return -EIO;
+		// dev_dbg(&client->dev, "bust i2c transfer error. addr=0x%x, buf=0x%x, len=%zu\n", client->addr, *buf, len);
+		retry_tmp++;
+		dev_dbg(&client->dev, "i2c transfer retry:%d.\n", retry_tmp);
+		dev_dbg(&client->dev, "write bust buf:%x.\n", client->addr);
+
+		if (retry_tmp > 50)
+		{
+			dev_err(&client->dev, "i2c transfer error.\n");
+			return -EIO;
+		}
 	}
 
 	return 0;
@@ -188,8 +202,13 @@ static int set_standby_mode_rel419(struct i2c_client *client, int enable)
 			return -EINVAL;
 		}
 
-		sensor_i2c_read_16b(client, 0x601a, &v);
-		if ((v & 0x200) != 0x200){
+		for (timeout = 0 ; timeout < 100 ; timeout ++) {
+			usleep_range(9000, 10000);
+			sensor_i2c_read_16b(client, 0x601a, &v);
+			if ((v & 0x200) == 0x200)
+				break;
+		}
+		if ( (v & 0x200) != 0x200 ) {
 			dev_dbg(&client->dev, "stop waking up: camera is working.\n");
 			return 0;
 		}
@@ -243,7 +262,12 @@ static int sensor_standby(struct i2c_client *client, int enable)
 	u16 checksum = 0;
 	dev_dbg(&client->dev, "%s():enable=%d\n", __func__, enable);
 
-	sensor_i2c_read_16b(client, 0x6134, &checksum);
+	for (timeout = 0 ; timeout < 50 ; timeout ++) {
+		usleep_range(9000, 10000);
+		sensor_i2c_read_16b(client, 0x6134, &checksum);
+		if (checksum == 0xFFFF)
+			break;
+	}
 
 	if(checksum != 0xFFFF){
 		return set_standby_mode_rel419(client, enable); // standby for rel419
@@ -607,6 +631,8 @@ static int sensor_board_setup(struct sensor_obj *priv)
 	int i;
 	u16 chipid = 0;
 	int err = 0;
+	int timeout;
+	int retry_f;
 
 	if (pdata->mclk_name) {
 		err = camera_common_mclk_enable(s_data);
@@ -651,17 +677,21 @@ static int sensor_board_setup(struct sensor_obj *priv)
 	gpio_set_value_cansleep(pw->reset_gpio, 1);
 	msleep(300);
 
-	err = sensor_i2c_read_16b(priv->tc_dev->client, 0, &chipid);
-	if (err) {
-		dev_err(dev, "%s() error during i2c read probe (%d)\n",
-			__func__, err);
-		goto err_reg_probe;
-	}
-	if (chipid != 0x265) {
-		err = -EIO;
-		dev_err(dev, "%s() invalid chip model id: %x\n",
-			__func__, chipid);
-		goto err_reg_probe;
+	for (timeout = 0 ; timeout < 50 ; timeout ++) {
+		err = sensor_i2c_read_16b(priv->tc_dev->client, 0, &chipid);
+		if ((timeout >= 50) && err) {
+			dev_err(dev, "%s() error during i2c read probe (%d)\n",
+				__func__, err);
+			goto err_reg_probe;
+		}
+		if ((timeout >= 50) && (chipid != 0x265)) {
+			err = -EIO;
+			dev_err(dev, "%s() invalid chip model id: %x\n",
+				__func__, chipid);
+			goto err_reg_probe;
+		}
+		if(!err)
+			break;
 	}
 
 	data_lanes = 2;
@@ -680,55 +710,87 @@ static int sensor_board_setup(struct sensor_obj *priv)
 			continuous_clock = 0;
 		}
 	}
+	retry_f = 0x01;
+	/*
+	bit 0: start bit
+	// bit 1: sensor_try_on fail
+	// bit 2: ap1302_otp_flash_init fail
+	bit 3: sensor_load_bootdata fail
+	bit 4-7: retry count
+	*/
+	while(retry_f) {
+		retry_f &= ~0x01;
 
-	priv->otp_flash_instance = tevi_ap1302_otp_flash_init(priv->tc_dev->client);
-	if(IS_ERR(priv->otp_flash_instance)) {
-		err = -EINVAL;
-		dev_err(dev, "otp flash init failed\n");
-		goto err_reg_probe;
-	}
+		gpio_set_value_cansleep(pw->reset_gpio, 0);
+		usleep_range(50, 500);
+		gpio_set_value_cansleep(pw->pwdn_gpio, 0);
+		msleep(10);
+		gpio_set_value_cansleep(pw->pwdn_gpio, 1);
+		usleep_range(500, 5000);
+		gpio_set_value_cansleep(pw->reset_gpio, 1);
+		msleep(10);
 
-	priv->header = priv->otp_flash_instance->header_data;
-	for(i = 0 ; i < ARRAY_SIZE(ap1302_sensor_table); i++)
-	{
-		if (strcmp((const char*)priv->header->product_name, ap1302_sensor_table[i].sensor_name) == 0)
+		priv->otp_flash_instance = tevi_ap1302_otp_flash_init(priv->tc_dev->client);
+		if(IS_ERR(priv->otp_flash_instance)) {
+			err = -EINVAL;
+			dev_err(dev, "otp flash init failed\n");
+			goto err_reg_probe;
+		}
+
+		priv->header = priv->otp_flash_instance->header_data;
+		for(i = 0 ; i < ARRAY_SIZE(ap1302_sensor_table); i++)
+		{
+			if (strcmp((const char*)priv->header->product_name, ap1302_sensor_table[i].sensor_name) == 0)
+				break;
+		}
+		priv->selected_sensor = i;
+		dev_info(dev, "selected_sensor:%d, sensor_name:%s\n", i, priv->header->product_name);
+
+		switch(priv->selected_sensor){
+		case TEVI_AP1302_AR0144:
+			s_data->frmfmt = ar0144_frmfmt;
+			s_data->numfmts = ARRAY_SIZE(ar0144_frmfmt);
 			break;
-	}
-	priv->selected_sensor = i;
-	dev_info(dev, "selected_sensor:%d, sensor_name:%s\n", i, priv->header->product_name);
+		case TEVI_AP1302_AR0234:
+			s_data->frmfmt = ar0234_frmfmt;
+			s_data->numfmts = ARRAY_SIZE(ar0234_frmfmt);
+			break;
+		case TEVI_AP1302_AR0521:
+		case TEVI_AP1302_AR0522:
+			s_data->frmfmt = ar0521_frmfmt;
+			s_data->numfmts = ARRAY_SIZE(ar0521_frmfmt);
+			break;
+		case TEVI_AP1302_AR0821:
+			s_data->frmfmt = ar0821_frmfmt;
+			s_data->numfmts = ARRAY_SIZE(ar0821_frmfmt);
+			break;
+		case TEVI_AP1302_AR1335:
+			s_data->frmfmt = ar1335_frmfmt;
+			s_data->numfmts = ARRAY_SIZE(ar1335_frmfmt);
+			break;
+		default:
+			s_data->frmfmt = sensor_frmfmt;
+			s_data->numfmts = ARRAY_SIZE(sensor_frmfmt);
+			break;
+		}
 
-	switch(priv->selected_sensor){
-	case TEVI_AP1302_AR0144:
-		s_data->frmfmt = ar0144_frmfmt;
-		s_data->numfmts = ARRAY_SIZE(ar0144_frmfmt);
-		break;
-	case TEVI_AP1302_AR0234:
-		s_data->frmfmt = ar0234_frmfmt;
-		s_data->numfmts = ARRAY_SIZE(ar0234_frmfmt);
-		break;
-	case TEVI_AP1302_AR0521:
-	case TEVI_AP1302_AR0522:
-		s_data->frmfmt = ar0521_frmfmt;
-		s_data->numfmts = ARRAY_SIZE(ar0521_frmfmt);
-		break;
-	case TEVI_AP1302_AR0821:
-		s_data->frmfmt = ar0821_frmfmt;
-		s_data->numfmts = ARRAY_SIZE(ar0821_frmfmt);
-		break;
-	case TEVI_AP1302_AR1335:
-		s_data->frmfmt = ar1335_frmfmt;
-		s_data->numfmts = ARRAY_SIZE(ar1335_frmfmt);
-		break;
-	default:
-		s_data->frmfmt = sensor_frmfmt;
-		s_data->numfmts = ARRAY_SIZE(sensor_frmfmt);
-		break;
-	}
+		if(sensor_load_bootdata(priv) != 0) {
+			dev_err(dev, "load bootdata failed\n");
+			retry_f |= 0x08 ;
+		}
 
-	if(sensor_load_bootdata(priv) != 0) {
-		err = -EINVAL;
-		dev_err(dev, "load bootdata failed\n");
-		goto err_reg_probe;
+		if ((retry_f & 0x0F) != 0x00) {
+			if (((retry_f & 0x30) >> 4 ) < 3 ) {
+				retry_f += 1 << 4;
+				retry_f &= ~0x0F;
+				dev_err(dev, "Probe retry:%d.\n", ((retry_f & 0x30) >> 4 ));
+			}
+			else {
+				retry_f &= 0x00;
+				dev_dbg(dev, "Probe retry failed\n");
+				goto err_reg_probe;
+			}
+		}
 	}
 
 	//cntx select 'Video'
