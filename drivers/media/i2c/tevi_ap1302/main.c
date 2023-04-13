@@ -816,6 +816,7 @@ static int sensor_board_setup(struct sensor_obj *priv)
 err_reg_probe:
 	gpio_set_value_cansleep(pw->reset_gpio, 0);
 	gpio_set_value_cansleep(pw->pwdn_gpio, 0);
+	err = -EINVAL;
 
 	if (pdata->mclk_name)
 		camera_common_mclk_disable(s_data);
