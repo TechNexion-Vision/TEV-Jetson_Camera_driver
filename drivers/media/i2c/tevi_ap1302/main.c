@@ -477,7 +477,7 @@ static struct camera_common_pdata *sensor_parse_dt(
 error:
 	devm_kfree(dev, board_priv_pdata);
 
-	return ret;
+	return NULL;
 }
 
 static int sensor_set_mode(struct tegracam_device *tc_dev)
