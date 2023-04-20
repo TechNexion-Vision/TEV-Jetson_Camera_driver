@@ -3,6 +3,7 @@
 #include <linux/delay.h>
 #include <linux/i2c.h>
 #include <linux/gpio/consumer.h>
+
 #include "vizionlink_cam.h"
 
 struct vh_st
@@ -26,41 +27,42 @@ static struct __reg8b_v __9096x_i2c_setting [] = {
 	{.reg = 0x0A, .value = 0x06}, //SCL High Time
 	{.reg = 0x0B, .value = 0x0C}, //SCL Low Time
 	{.reg = 0x0D, .value = 0xB9}, //IO_CTL
+
 	{.reg = 0x32, .value = 0x01}, //CSI_PORT_SEL
-	{.reg = 0x33, .value = 0x20}, //CSI_CTL
-	{.reg = 0x1F, .value = 0x00}, //CSI_PLL_CTL
+	{.reg = 0x33, .value = 0x21}, //CSI_CTL
+	{.reg = 0x1F, .value = 0x01}, //CSI_PLL_CTL
 
 	//Port config/setting
 	{.reg = 0x4C, .value = 0x01}, //FPD3_PORT_SEL,Port 0
-	{.reg = 0x58, .value = 0x5E}, //BCC_CONFIG
+	{.reg = 0x58, .value = 0x5A}, //BCC_CONFIG
 	{.reg = 0x6D, .value = 0x7C}, //PORT_CONFIG
+	{.reg = 0x7C, .value = 0x38}, //PORT_CONFIG2
+	{.reg = 0x7D, .value = 0x80}, //PORT_PASS_CTL
 
 	{.reg = 0x4C, .value = 0x12}, //FPD3_PORT_SEL,Port 1
-	{.reg = 0x58, .value = 0x5E}, //BCC_CONFIG
+	{.reg = 0x58, .value = 0x5A}, //BCC_CONFIG
 	{.reg = 0x6D, .value = 0x7C}, //PORT_CONFIG
+	{.reg = 0x7C, .value = 0x38}, //PORT_CONFIG2
+	{.reg = 0x7D, .value = 0x80}, //PORT_PASS_CTL
 
 	{.reg = 0x4C, .value = 0x24}, //FPD3_PORT_SEL,Port 2
-	{.reg = 0x58, .value = 0x5E}, //BCC_CONFIG
+	{.reg = 0x58, .value = 0x5A}, //BCC_CONFIG
 	{.reg = 0x6D, .value = 0x7C}, //PORT_CONFIG
+	{.reg = 0x7C, .value = 0x38}, //PORT_CONFIG2
+	{.reg = 0x7D, .value = 0x80}, //PORT_PASS_CTL
 
 	{.reg = 0x4C, .value = 0x38}, //FPD3_PORT_SEL,Port 3
-	{.reg = 0x58, .value = 0x5E}, //BCC_CONFIG
+	{.reg = 0x58, .value = 0x5A}, //BCC_CONFIG
 	{.reg = 0x6D, .value = 0x7C}, //PORT_CONFIG
+	{.reg = 0x7C, .value = 0x38}, //PORT_CONFIG2
+	{.reg = 0x7D, .value = 0x80}, //PORT_PASS_CTL
 
-	{.reg = 0x10, .value = 0x91}, //FS_HIGH_TIME_1
-	{.reg = 0x19, .value = 0x0A}, //FS_HIGH_TIME_1
-	{.reg = 0x1A, .value = 0xD7}, //FS_HIGH_TIME_0
-	{.reg = 0x1B, .value = 0x61}, //FS_LOW_TIME_1
-	{.reg = 0x1C, .value = 0xA0}, //FS_LOW_TIME_0
-	{.reg = 0x18, .value = 0x01}, //FS_CTL
-	
-	{.reg = 0x7C, .value = 0x20}, //
 	{.reg = 0xB0, .value = 0x1C}, //IND_ACC_CTL
 };
 
 static int __i2c_read(struct i2c_client *client, u8 reg, u8 *val, u8 size)
 {
-	dev_dbg(&client->dev, "read reg 0x%x, size %d\n", reg, size);
+	dev_dbg(&client->dev, "ub962%s(): reg 0x%x, size %d\n", __func__, reg, size);
 
 	if (1 != i2c_master_send(client, &reg, 1))
 		goto __except;
@@ -78,7 +80,7 @@ static int __i2c_write(struct i2c_client *client, u8 reg, u8 val)
 {
 	u8 sb[2];
 
-	dev_dbg(&client->dev, "write reg 0x%x, val 0x%x\n", reg, val);
+	dev_dbg(&client->dev, "ub962%s(): reg 0x%x, val 0x%x\n", __func__, reg, val);
 
 	sb[0] = reg;
 	sb[1] = val;
@@ -164,9 +166,6 @@ static int vh_check_port_lock_pass(struct vh_st *this)
 		msleep(100);
 		__i2c_read(this->i2c_client, 0x4d, &v, 1);
 
-		if((v & 0xC0) >> 6 != vc_port){
-			return ret;
-		}
 		if ((v & 0x7) == 3) {
 			__i2c_read(this->i2c_client, 0x5b, &v, 1);
 			__i2c_write(this->i2c_client, 0x5c,
@@ -446,7 +445,6 @@ static int vh_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	struct vh_st *obj = NULL;
 	u32 temp;
 	u32 addr;
-	u32 timeout;
 
 	dev_info(&client->dev, "%s\n", client->dev.of_node->full_name);
 
@@ -501,14 +499,9 @@ static int vh_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		return -EINVAL;
 	}
 
-	for (timeout = 0 ; timeout < 500 ; timeout ++) {
-		usleep_range(9000, 10000);
-		if (vc_init(client, obj->ser_alias_addr) == 0) {
-			break;
-		}
-	}
-	if (timeout >= 500 ) {
-		dev_err(&client->dev, "Failed to initial vizionlink-cam board\n");
+	if (vc_init(client, obj->ser_alias_addr) != 0) {
+		dev_err(&client->dev,
+			"Failed to initial vizionlink-cam board\n");
 		return -EINVAL;
 	}
 
@@ -522,13 +515,7 @@ static int vh_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		return -EINVAL;
 	}
 
-	for (timeout = 0 ; timeout < 500 ; timeout ++) {
-		usleep_range(9000, 10000);
-		if (vc_configure_ser_csi(client, obj->ser_alias_addr) == 0) {
-			break;
-		}
-	}
-	if (timeout >= 500 ) {
+	if (vc_configure_ser_csi(client, obj->ser_alias_addr) != 0) {
 		dev_err(&client->dev, "Failed to configure serializer csi\n");
 		return -EINVAL;
 	}

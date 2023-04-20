@@ -23,7 +23,7 @@ static int __i2c_read(struct i2c_client *client, u8 addr, u8 reg, u8 *val, u8 si
 	int ret;
 
 	dev_dbg(&client->dev,
-		"%s() addr 0x%x, read reg 0x%x, size %d\n",
+		"ub953%s(): addr 0x%x, read reg 0x%x, size %d\n",
 		__func__,
 		addr,
 		reg,
@@ -52,10 +52,9 @@ static int __i2c_write(struct i2c_client *client, u8 addr, u8 reg, u8 val)
 	struct i2c_msg msg;
 	u8 buf[2];
 	int ret;
-	int retry_tmp = 0;
 
 	dev_dbg(&client->dev,
-		"%s() addr 0x%x, read reg 0x%x, val 0x%x\n",
+		"ub953%s(): addr 0x%x, read reg 0x%x, val 0x%x\n",
 		__func__,
 		addr,
 		reg,
@@ -69,13 +68,9 @@ static int __i2c_write(struct i2c_client *client, u8 addr, u8 reg, u8 val)
 	msg.buf = buf;
 	msg.len = sizeof(buf);
 
-	while((ret = i2c_transfer(client->adapter, &msg, 1)) < 0)
-	{
-		retry_tmp++;
-		dev_dbg(&client->dev, "i2c transfer retry:%d.\n", retry_tmp);
-
-		if (retry_tmp > 50)
-			dev_err(&client->dev, "i2c transfer error\n");
+	ret = i2c_transfer(client->adapter, &msg, 1);
+	if (ret < 0) {
+		dev_err(&client->dev, "i2c transfer error\n");
 	}
 
 	return ret;
@@ -86,10 +81,22 @@ int vc_init(struct i2c_client *client, u8 ser_alias_addr)
 	u8 v = 0;
 	int ret = 0;
 	int i = 0;
+	int count = 0;
 
 	//90953 Digital Reset
 	__i2c_write(client, ser_alias_addr, 1, 3);
 	msleep(20);
+	__i2c_read(client, ser_alias_addr, 3, &v, 1);
+
+	while((v & 0x13) != 0x13){
+		if(count++ > 10){
+			dev_err(&client->dev, "Set Async Mode Fail!\n");
+			return -EINVAL;
+		}
+		__i2c_write(client, ser_alias_addr, 3, v | 0x13);
+		msleep(50);
+		__i2c_read(client, ser_alias_addr, 3, &v, 1);
+	}
 
 	__i2c_read(client, ser_alias_addr, 3, &v, 1);
 	while ((v & 0x8) != 0x8) {
@@ -116,7 +123,9 @@ int vc_init(struct i2c_client *client, u8 ser_alias_addr)
 		break;
 	case 3:
 		dev_info(&client->dev,
-			 "Non Sync Mode\n");
+			 "Non Sync, internal AON clock Mode\n");
+		//  __i2c_read(client, ser_alias_addr, 0x5, &v, 1);
+		//  __i2c_write(client, ser_alias_addr, 0x5, v | 0x8);
 		break;
 	default:
 		dev_err(&client->dev,
