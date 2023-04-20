@@ -453,6 +453,7 @@ static struct camera_common_pdata *sensor_parse_dt(
 		goto error;
 	}
 	board_priv_pdata->reset_gpio = (unsigned int)gpio;
+	gpio_direction_output(board_priv_pdata->reset_gpio, 1);
 
 	err = of_property_read_string(np, "mclk", &board_priv_pdata->mclk_name);
 	if (err)
@@ -723,12 +724,8 @@ static int sensor_board_setup(struct sensor_obj *priv)
 
 		gpio_set_value_cansleep(pw->reset_gpio, 0);
 		usleep_range(50, 500);
-		gpio_set_value_cansleep(pw->pwdn_gpio, 0);
-		msleep(10);
-		gpio_set_value_cansleep(pw->pwdn_gpio, 1);
-		usleep_range(500, 5000);
 		gpio_set_value_cansleep(pw->reset_gpio, 1);
-		msleep(10);
+		msleep(100);
 
 		priv->otp_flash_instance = tevi_ap1302_otp_flash_init(priv->tc_dev->client);
 		if(IS_ERR(priv->otp_flash_instance)) {
