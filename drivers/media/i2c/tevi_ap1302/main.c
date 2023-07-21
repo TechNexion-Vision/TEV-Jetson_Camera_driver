@@ -1,4 +1,3 @@
-// #define DEBUG           /* Enable dev_dbg */
 #include <linux/slab.h>
 #include <linux/uaccess.h>
 #include <linux/gpio.h>
@@ -25,12 +24,14 @@ static const u32 ctrl_cid_list[] = {
 	TEGRA_CAMERA_CID_FRAME_RATE,
 	TEGRA_CAMERA_CID_SENSOR_MODE_ID,
 };
+
 struct sensor_obj {
 	struct v4l2_subdev		*subdev;
 	struct camera_common_data	*s_data;
 	struct tegracam_device		*tc_dev;
 	struct otp_flash		*otp_flash_instance;
 	struct header_ver2 *header;
+	struct header_ver3 *headerv3;
 	int exp_gpio;
 	int info_gpio;
 	u8 selected_mode;
@@ -67,7 +68,7 @@ static int sensor_i2c_read_16b(struct i2c_client *client, u16 reg, u16 *value)
 	ret = sensor_i2c_read(client, reg, v, 2);
 
 	if (unlikely(ret < 0)) {
-		dev_dbg(&client->dev, "i2c transfer error. addr=%x, reg=%x, val=%x\n", client->addr, reg, *value);
+		dev_err(&client->dev, "i2c transfer error. addr=%x, reg=%x, val=%x\n", client->addr, reg, *value);
 		return ret;
 	}
 
@@ -82,7 +83,7 @@ static int sensor_i2c_write_16b(struct i2c_client *client, u16 reg, u16 val)
 {
 	struct i2c_msg msg;
 	u8 buf[4];
-	int retry_tmp = 0;
+	int ret;
 
 	buf[0] = reg >> 8;
 	buf[1] = reg & 0xff;
@@ -94,25 +95,20 @@ static int sensor_i2c_write_16b(struct i2c_client *client, u16 reg, u16 val)
 	msg.buf = buf;
 	msg.len = sizeof(buf);
 
-	while((i2c_transfer(client->adapter, &msg, 1)) < 0)
+	ret = i2c_transfer(client->adapter, &msg, 1);
+	if (ret < 0)
 	{
-		retry_tmp++;
-		dev_dbg(&client->dev, "i2c transfer retry:%d.\n", retry_tmp);
-		dev_dbg(&client->dev, "write 16b reg:%x val:%x.\n", reg, val);
-
-		if (retry_tmp > 50)
-		{
-			dev_err(&client->dev, "i2c transfer error\n");
-			return -EIO;
-		}
+		dev_err(&client->dev, "i2c transfer error. addr=%x, reg=%x, val=%x\n", client->addr, reg, val);
+		return -EIO;
 	}
+
 	return 0;
 }
 
 static int sensor_i2c_write_bust(struct i2c_client *client, u8 *buf, size_t len)
 {
 	struct i2c_msg msg;
-	int retry_tmp = 0;
+	int ret;
 
 	if (len == 0) {
 		return 0;
@@ -123,21 +119,11 @@ static int sensor_i2c_write_bust(struct i2c_client *client, u8 *buf, size_t len)
 	msg.buf = buf;
 	msg.len = len;
 
-	dev_dbg(&client->dev, "bust i2c transfer : addr=0x%x, buf=0x%x, len=%zu\n", client->addr, *buf, len);
-
-
-	while((i2c_transfer(client->adapter, &msg, 1)) < 0)
+	ret = i2c_transfer(client->adapter, &msg, 1);
+	if (ret < 0)
 	{
-		// dev_dbg(&client->dev, "bust i2c transfer error. addr=0x%x, buf=0x%x, len=%zu\n", client->addr, *buf, len);
-		retry_tmp++;
-		dev_dbg(&client->dev, "i2c transfer retry:%d.\n", retry_tmp);
-		dev_dbg(&client->dev, "write bust buf:%x.\n", client->addr);
-
-		if (retry_tmp > 50)
-		{
-			dev_err(&client->dev, "i2c transfer error.\n");
-			return -EIO;
-		}
+		dev_err(&client->dev, "i2c transfer error.\n");
+		return -EIO;
 	}
 
 	return 0;
@@ -147,7 +133,12 @@ static const struct regmap_config sensor_regmap_config = {
 	.reg_bits = 16,
 	.val_bits = 8,
 	.cache_type = REGCACHE_RBTREE,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0)
 	.use_single_rw = true,
+#else
+	.use_single_read = true,
+	.use_single_write = true,
+#endif
 };
 
 static int sensor_set_frame_rate(struct tegracam_device *tc_dev, s64 val)
@@ -444,6 +435,7 @@ static struct camera_common_pdata *sensor_parse_dt(
 		goto error;
 	}
 	board_priv_pdata->pwdn_gpio = (unsigned int)gpio;
+	gpio_direction_output(board_priv_pdata->pwdn_gpio, 1);
 
 	gpio = of_get_named_gpio(np, "reset-gpios", 0);
 	if (gpio < 0) {
@@ -453,7 +445,6 @@ static struct camera_common_pdata *sensor_parse_dt(
 		goto error;
 	}
 	board_priv_pdata->reset_gpio = (unsigned int)gpio;
-	gpio_direction_output(board_priv_pdata->reset_gpio, 1);
 
 	err = of_property_read_string(np, "mclk", &board_priv_pdata->mclk_name);
 	if (err)
@@ -478,7 +469,7 @@ static struct camera_common_pdata *sensor_parse_dt(
 error:
 	devm_kfree(dev, board_priv_pdata);
 
-	return NULL;
+	return ret;
 }
 
 static int sensor_set_mode(struct tegracam_device *tc_dev)
@@ -507,7 +498,7 @@ static int sensor_start_streaming(struct tegracam_device *tc_dev)
 
 	if (ret == 0) {
 		int fps = *ap1302_sensor_table[priv->selected_sensor].frmfmt[priv->selected_mode].framerates;
-		dev_dbg(tc_dev->dev, "%s() width=%d, height=%d, fps=%d\n", __func__, 
+		dev_info(tc_dev->dev, "%s() width=%d, height=%d, fps=%d\n", __func__, 
 			ap1302_sensor_table[priv->selected_sensor].frmfmt[priv->selected_mode].size.width, 
 			ap1302_sensor_table[priv->selected_sensor].frmfmt[priv->selected_mode].size.height, 
 			fps);
@@ -533,13 +524,38 @@ static int sensor_stop_streaming(struct tegracam_device *tc_dev)
 	return sensor_standby(tc_dev->client, 1);
 }
 
+static inline int sensor_read_reg(struct camera_common_data *s_data,
+	u16 addr, u8 *val)
+{
+	int err = 0;
+	u32 reg_val = 0;
+
+	err = regmap_read(s_data->regmap, addr, &reg_val);
+	*val = reg_val & 0xff;
+
+	return err;
+}
+
+static inline int sensor_write_reg(struct camera_common_data *s_data,
+	u16 addr, u8 val)
+{
+	int err = 0;
+
+	err = regmap_write(s_data->regmap, addr, val);
+	if (err)
+		dev_err(s_data->dev, "%s: i2c write failed, 0x%x = %x",
+			__func__, addr, val);
+
+	return err;
+}
+
 static struct camera_common_sensor_ops sensor_common_ops = {
 	.numfrmfmts = ARRAY_SIZE(sensor_frmfmt),
 	.frmfmt_table = sensor_frmfmt,
 	.power_on = sensor_power_on,
 	.power_off = sensor_power_off,
-//	.write_reg = sensor_write_reg,
-//	.read_reg = sensor_read_reg,
+	.write_reg = sensor_write_reg,
+	.read_reg = sensor_read_reg,
 	.parse_dt = sensor_parse_dt,
 	.power_get = sensor_power_get,
 	.power_put = sensor_power_put,
@@ -570,6 +586,7 @@ static int sensor_load_bootdata(struct sensor_obj *priv)
 
 	checksum = tevi_ap1302_otp_flash_get_checksum(priv->otp_flash_instance);
 
+	//load bootdata ronaming
 	while(len != 0) {
 		while(i < BOOT_DATA_WRITE_LEN) {
 			bootdata_temp_area[0] =
@@ -630,10 +647,9 @@ static int sensor_board_setup(struct sensor_obj *priv)
 	int continuous_clock;
 	bool has_rpi = false;
 	int i;
+	u8* header_ptr;
 	u16 chipid = 0;
 	int err = 0;
-	int timeout;
-	int retry_f;
 
 	if (pdata->mclk_name) {
 		err = camera_common_mclk_enable(s_data);
@@ -674,26 +690,24 @@ static int sensor_board_setup(struct sensor_obj *priv)
 		gpio_set_value_cansleep(priv->exp_gpio, 1);
 		gpio_set_value_cansleep(priv->info_gpio, 1);
 	}
-
+	gpio_set_value_cansleep(pw->pwdn_gpio, 0);
+	msleep(500);
 	gpio_set_value_cansleep(pw->reset_gpio, 1);
 	msleep(300);
 
-	for (timeout = 0 ; timeout < 50 ; timeout ++) {
-		err = sensor_i2c_read_16b(priv->tc_dev->client, 0, &chipid);
-		if ((timeout >= 50) && err) {
-			dev_err(dev, "%s() error during i2c read probe (%d)\n",
-				__func__, err);
-			goto err_reg_probe;
-		}
-		if ((timeout >= 50) && (chipid != 0x265)) {
-			err = -EIO;
-			dev_err(dev, "%s() invalid chip model id: %x\n",
-				__func__, chipid);
-			goto err_reg_probe;
-		}
-		if(!err)
-			break;
+	err = sensor_i2c_read_16b(priv->tc_dev->client, 0, &chipid);
+	if (err) {
+		dev_err(dev, "%s() error during i2c read probe (%d)\n",
+			__func__, err);
+		goto err_reg_probe;
 	}
+	if (chipid != 0x265) {
+		err = -EIO;
+		dev_err(dev, "%s() invalid chip model id: %x\n",
+			__func__, chipid);
+		goto err_reg_probe;
+	}
+	dev_info(dev, "AP1302 chip ID 0x%04X\n", chipid);
 
 	data_lanes = 2;
 	if (of_property_read_u32(dev->of_node, "data-lanes", &data_lanes) == 0) {
@@ -711,29 +725,17 @@ static int sensor_board_setup(struct sensor_obj *priv)
 			continuous_clock = 0;
 		}
 	}
-	retry_f = 0x01;
-	/*
-	bit 0: start bit
-	// bit 1: sensor_try_on fail
-	// bit 2: ap1302_otp_flash_init fail
-	bit 3: sensor_load_bootdata fail
-	bit 4-7: retry count
-	*/
-	while(retry_f) {
-		retry_f &= ~0x01;
 
-		gpio_set_value_cansleep(pw->reset_gpio, 0);
-		usleep_range(50, 500);
-		gpio_set_value_cansleep(pw->reset_gpio, 1);
-		msleep(100);
+	priv->otp_flash_instance = tevi_ap1302_otp_flash_init(priv->tc_dev->client);
+	if(IS_ERR(priv->otp_flash_instance)) {
+		err = -EINVAL;
+		dev_err(dev, "otp flash init failed\n");
+		goto err_reg_probe;
+	}
 
-		priv->otp_flash_instance = tevi_ap1302_otp_flash_init(priv->tc_dev->client);
-		if(IS_ERR(priv->otp_flash_instance)) {
-			err = -EINVAL;
-			dev_err(dev, "otp flash init failed\n");
-			goto err_reg_probe;
-		}
+	header_ptr = (u8*)priv->otp_flash_instance->header_data;
 
+	if(header_ptr[0] == 2) {
 		priv->header = priv->otp_flash_instance->header_data;
 		for(i = 0 ; i < ARRAY_SIZE(ap1302_sensor_table); i++)
 		{
@@ -742,52 +744,50 @@ static int sensor_board_setup(struct sensor_obj *priv)
 		}
 		priv->selected_sensor = i;
 		dev_info(dev, "selected_sensor:%d, sensor_name:%s\n", i, priv->header->product_name);
-
-		switch(priv->selected_sensor){
-		case TEVI_AP1302_AR0144:
-			s_data->frmfmt = ar0144_frmfmt;
-			s_data->numfmts = ARRAY_SIZE(ar0144_frmfmt);
-			break;
-		case TEVI_AP1302_AR0234:
-			s_data->frmfmt = ar0234_frmfmt;
-			s_data->numfmts = ARRAY_SIZE(ar0234_frmfmt);
-			break;
-		case TEVI_AP1302_AR0521:
-		case TEVI_AP1302_AR0522:
-			s_data->frmfmt = ar0521_frmfmt;
-			s_data->numfmts = ARRAY_SIZE(ar0521_frmfmt);
-			break;
-		case TEVI_AP1302_AR0821:
-			s_data->frmfmt = ar0821_frmfmt;
-			s_data->numfmts = ARRAY_SIZE(ar0821_frmfmt);
-			break;
-		case TEVI_AP1302_AR1335:
-			s_data->frmfmt = ar1335_frmfmt;
-			s_data->numfmts = ARRAY_SIZE(ar1335_frmfmt);
-			break;
-		default:
-			s_data->frmfmt = sensor_frmfmt;
-			s_data->numfmts = ARRAY_SIZE(sensor_frmfmt);
-			break;
+	}
+	else if(header_ptr[0] == 3) {
+		priv->headerv3 = priv->otp_flash_instance->header_data;
+		for(i = 0 ; i < ARRAY_SIZE(ap1302_sensor_table); i++)
+		{
+			if (strcmp((const char*)priv->headerv3->product_name, ap1302_sensor_table[i].sensor_name) == 0)
+				break;
 		}
+		priv->selected_sensor = i;
+		dev_info(dev, "selected_sensor:%d, sensor_name:%s\n", i, priv->headerv3->product_name);
+	}
 
-		if(sensor_load_bootdata(priv) != 0) {
-			dev_err(dev, "load bootdata failed\n");
-			retry_f |= 0x08 ;
-		}
+	switch(priv->selected_sensor){
+	case TEVI_AP1302_AR0144:
+		s_data->frmfmt = ar0144_frmfmt;
+		s_data->numfmts = ARRAY_SIZE(ar0144_frmfmt);
+		break;
+	case TEVI_AP1302_AR0234:
+		s_data->frmfmt = ar0234_frmfmt;
+		s_data->numfmts = ARRAY_SIZE(ar0234_frmfmt);
+		break;
+	case TEVI_AP1302_AR0521:
+	case TEVI_AP1302_AR0522:
+		s_data->frmfmt = ar0521_frmfmt;
+		s_data->numfmts = ARRAY_SIZE(ar0521_frmfmt);
+		break;
+	case TEVI_AP1302_AR0821:
+		s_data->frmfmt = ar0821_frmfmt;
+		s_data->numfmts = ARRAY_SIZE(ar0821_frmfmt);
+		break;
+	case TEVI_AP1302_AR1335:
+		s_data->frmfmt = ar1335_frmfmt;
+		s_data->numfmts = ARRAY_SIZE(ar1335_frmfmt);
+		break;
+	default:
+		s_data->frmfmt = sensor_frmfmt;
+		s_data->numfmts = ARRAY_SIZE(sensor_frmfmt);
+		break;
+	}
 
-		if ((retry_f & 0x0F) != 0x00) {
-			if (((retry_f & 0x30) >> 4 ) < 3 ) {
-				retry_f += 1 << 4;
-				retry_f &= ~0x0F;
-				dev_err(dev, "Probe retry:%d.\n", ((retry_f & 0x30) >> 4 ));
-			}
-			else {
-				retry_f &= 0x00;
-				dev_dbg(dev, "Probe retry failed\n");
-				goto err_reg_probe;
-			}
-		}
+	if(sensor_load_bootdata(priv) != 0) {
+		err = -EINVAL;
+		dev_err(dev, "load bootdata failed\n");
+		goto err_reg_probe;
 	}
 
 	//cntx select 'Video'
@@ -805,6 +805,7 @@ static int sensor_board_setup(struct sensor_obj *priv)
 	//non-continuous clock,2 lane
 	sensor_i2c_write_16b(priv->tc_dev->client, 0x2030,
 			     0x10 | (continuous_clock << 5) | (data_lanes)); //VIDEO_HINF_CTRL
+	sensor_i2c_write_16b(priv->tc_dev->client, 0x2032, 0); //HINF_SPOOF_W
 	sensor_i2c_write_16b(priv->tc_dev->client, 0x1184, 0xb); //ATOMIC
 
 	//let ap1302 go to standby mode
@@ -813,7 +814,6 @@ static int sensor_board_setup(struct sensor_obj *priv)
 err_reg_probe:
 	gpio_set_value_cansleep(pw->reset_gpio, 0);
 	gpio_set_value_cansleep(pw->pwdn_gpio, 0);
-	err = -EINVAL;
 
 	if (pdata->mclk_name)
 		camera_common_mclk_disable(s_data);
@@ -841,7 +841,6 @@ static int sensor_probe(struct i2c_client *client, const struct i2c_device_id *i
 	struct sensor_obj *priv;
 	int err;
 
-	dev_info(dev, "probe tevi-ap1302 START...\n");
 	dev_dbg(dev, "probing v4l2 sensor at addr 0x%0x\n", client->addr);
 
 	if (!IS_ENABLED(CONFIG_OF) || !client->dev.of_node)

@@ -46,6 +46,7 @@ struct otp_flash *tevi_ap1302_otp_flash_init(struct i2c_client *client)
 	struct device *dev = &client->dev;
 	u8 __header_ver;
 	struct header_ver2 *header;
+	struct header_ver3 *headerv3;
 	// int ret;
 
 	instance = devm_kzalloc(dev, sizeof(struct otp_flash), GFP_KERNEL);
@@ -87,7 +88,34 @@ struct otp_flash *tevi_ap1302_otp_flash_init(struct i2c_client *client)
 
 		return instance;
 
-	} else {
+	} 
+	else if(__header_ver == 3) {
+		instance->header_data =
+			devm_kzalloc(dev, sizeof(struct header_ver3),
+				     GFP_KERNEL);
+
+		nvmem_device_read(instance->nvmem,
+				  0,
+				  sizeof(struct header_ver3),
+				  instance->header_data);
+
+		headerv3 = instance->header_data;
+		instance->product_name = headerv3->product_name;
+		dev_info(dev, "Product:%s, HeaderVer:%d, Version:%d.%d.%d.%d, MIPI_Rate:%d\n",
+			 headerv3->product_name,
+			 headerv3->header_version,
+			 headerv3->tn_fw_version[0],
+			 headerv3->tn_fw_version[1],
+			 headerv3->vendor_fw_version,
+			 headerv3->custom_number,
+			 headerv3->mipi_datarate);
+
+		dev_dbg(dev, "content checksum: %x, content length: %d\n",
+				headerv3->content_checksum, headerv3->content_len);
+
+		return instance;
+	}
+	else {
 		dev_err(dev, "can't recognize header version number '0x%X'\n",
 			__header_ver);
 	}
@@ -99,10 +127,15 @@ fail:
 u16 tevi_ap1302_otp_flash_get_checksum(struct otp_flash *instance)
 {
 	struct header_ver2 *header;
+	struct header_ver3 *headerv3;
 
 	if( ((u8*)instance->header_data)[0] == 2 ) {
 		header = (struct header_ver2 *)instance->header_data;
 		return header->content_checksum;
+	}
+	else if(((u8*)instance->header_data)[0] == 3 ) {
+		headerv3 = (struct header_ver3 *)instance->header_data;
+		return headerv3->content_checksum;
 	}
 
 	return 0xffff;
@@ -112,6 +145,7 @@ size_t tevi_ap1302_otp_flash_read(struct otp_flash *instance, u8 *data, int addr
 {
 	u8 *temp;
 	struct header_ver2 *header;
+	struct header_ver3 *headerv3;
 	size_t l;
 
 	temp = (u8*)instance->header_data;
@@ -126,37 +160,16 @@ size_t tevi_ap1302_otp_flash_read(struct otp_flash *instance, u8 *data, int addr
 				  data);
 		return l;
 	}
+	else if(temp[0] == 3) {
+		headerv3 = (struct header_ver3 *)instance->header_data;
+		l = len > BOOT_DATA_WRITE_LEN ? BOOT_DATA_WRITE_LEN : len;
+		l = (headerv3->content_len - addr) < l ? headerv3->content_len - addr : l;
 
-	return 0;
-}
-
-size_t tevi_ap1302_otp_flash_get_pll_length(struct otp_flash *instance)
-{
-	u8 *temp;
-	struct header_ver2 *header;
-
-	temp = (u8*)instance->header_data;
-	if(temp[0] == 2) {
-		header = (struct header_ver2 *)instance->header_data;
-		return header->pll_bootdata_len;
-	}
-
-	return 0;
-}
-
-size_t tevi_ap1302_otp_flash_get_pll_section(struct otp_flash *instance, u8 *data)
-{
-	u8 *temp;
-	struct header_ver2 *header;
-
-	temp = (u8*)instance->header_data;
-	if(temp[0] == 2) {
-		header = (struct header_ver2 *)instance->header_data;
-		if (header->pll_bootdata_len != 0) {
-			tevi_ap1302_otp_flash_read(instance, data, 0,
-				       header->pll_bootdata_len);
-		}
-		return header->pll_bootdata_len;
+		nvmem_device_read(instance->nvmem,
+				  addr + headerv3->content_offset,
+				  l,
+				  data);
+		return l;
 	}
 
 	return 0;
