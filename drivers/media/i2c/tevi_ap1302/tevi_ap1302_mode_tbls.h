@@ -19,6 +19,7 @@ enum
 	TEVI_AP1302_AR0521,
 	TEVI_AP1302_AR0522,
 	TEVI_AP1302_AR0821,
+	TEVI_AP1302_AR0822,
 	TEVI_AP1302_AR1335,
 };
 
@@ -89,6 +90,11 @@ static struct sensor_info ap1302_sensor_table[] = {
 	},
 	{
 		.sensor_name = "TEVI-AR0821",
+		.frmfmt = ar0821_frmfmt,
+		.res_list_size = ARRAY_SIZE(ar0821_frmfmt)
+	},
+	{
+		.sensor_name = "TEVI-AR0822",
 		.frmfmt = ar0821_frmfmt,
 		.res_list_size = ARRAY_SIZE(ar0821_frmfmt)
 	},
