@@ -9,15 +9,15 @@
 
 ## NVIDIA Jetson EVK Support List
 
-|              | NVIDIA Jetson Xavier NX                                      | NVIDIA Jetson Nano                                           |
-| :----------: | ------------------------------------------------------------ | ------------------------------------------------------------ |
-| Support List | TEVI-OV5640<br />TEVI-AR0521<br />TEVI-AR0522<br />TEVI-AR0144<br />TEVI-AR0234<br />TEVI-AR0821<br />TEVI-AR0822(Q3/2022) | TEVI-OV5640<br />TEVI-AR0521<br />TEVI-AR0522<br />TEVI-AR0144<br />TEVI-AR0234<br />TEVI-AR0821<br />TEVI-AR0822(Q3/2022) |
+|              | NVIDIA Jetson Xavier NX                                      | NVIDIA Jetson Nano                                           | NVIDIA Jetson Orin                                           |
+| :----------: | ------------------------------------------------------------ | ------------------------------------------------------------ |------------------------------------------------------------ |
+| Support List | TEVI-OV5640<br />TEVI-AR0521<br />TEVI-AR0522<br />TEVI-AR0144<br />TEVI-AR0234<br />TEVI-AR0821<br />TEVI-AR0822(Q3/2022) | TEVI-OV5640<br />TEVI-AR0521<br />TEVI-AR0522<br />TEVI-AR0144<br />TEVI-AR0234<br />TEVI-AR0821<br />TEVI-AR0822 | TEVI-AR0144<br />TEVI-AR0234<br />TEVI-AR0822 |
 
 ## Technexion TEK Series Support List
 
 |              | JetsonXavier-NX TN-TEK 3/8                                   | JetsonNano TN-TEK 3                                          |
 | :----------: | ------------------------------------------------------------ | ------------------------------------------------------------ |
-| Support List | TEVI-OV5640<br />TEVI-AR0521<br />TEVI-AR0522<br />TEVI-AR0144<br />TEVI-AR0234<br />TEVI-AR0821<br />TEVI-AR0822(Q3/2022) | TEVI-OV5640<br />TEVI-AR0521<br />TEVI-AR0522<br />TEVI-AR0144<br />TEVI-AR0234<br />TEVI-AR0821<br />TEVI-AR0822(Q3/2022) |
+| Support List | TEVI-OV5640<br />TEVI-AR0521<br />TEVI-AR0522<br />TEVI-AR0144<br />TEVI-AR0234<br />TEVI-AR0821<br />TEVI-AR0822(Q3/2022) | TEVI-OV5640<br />TEVI-AR0521<br />TEVI-AR0522<br />TEVI-AR0144<br />TEVI-AR0234<br />TEVI-AR0821<br />TEVI-AR0822 |
 
 ## WIKI Pages
 
