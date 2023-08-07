@@ -298,49 +298,6 @@ static int vh_setting_i2c_alias_map(struct vh_st *this)
 
 #define I2C_CLIENT_HOST_NOTIFY	0x40	/* We want to use I2C host notify */
 
-int of_i2c_get_board_info(struct device *dev, struct device_node *node,
-			  struct i2c_board_info *info)
-{
-	u32 addr;
-	int ret;
-	dev_info(dev, "%s:name=%s\n", __func__, node->name);
-
-	memset(info, 0, sizeof(*info));
-
-	if (of_modalias_node(node, info->type, sizeof(info->type)) < 0) {
-		dev_err(dev, "of_i2c: modalias failure on %pOF\n", node);
-		return -EINVAL;
-	}
-
-	ret = of_property_read_u32(node, "reg", &addr);
-	if (ret) {
-		dev_err(dev, "of_i2c: invalid reg on %pOF\n", node);
-		return ret;
-	}
-
-	if (addr & I2C_TEN_BIT_ADDRESS) {
-		addr &= ~I2C_TEN_BIT_ADDRESS;
-		info->flags |= I2C_CLIENT_TEN;
-	}
-
-	if (addr & I2C_OWN_SLAVE_ADDRESS) {
-		addr &= ~I2C_OWN_SLAVE_ADDRESS;
-		info->flags |= I2C_CLIENT_SLAVE;
-	}
-
-	info->addr = addr;
-	info->of_node = node;
-
-	if (of_property_read_bool(node, "host-notify"))
-		info->flags |= I2C_CLIENT_HOST_NOTIFY;
-
-	if (of_get_property(node, "wakeup-source", NULL))
-		info->flags |= I2C_CLIENT_WAKE;
-
-	return 0;
-}
-EXPORT_SYMBOL_GPL(of_i2c_get_board_info);
-
 static int vh_append_i2c_device(struct vh_st *this)
 {
 	struct device *dev = &this->i2c_client->dev;
@@ -362,7 +319,7 @@ static int vh_append_i2c_device(struct vh_st *this)
 			continue;
 		}
 
-		client = i2c_new_device(this->i2c_client->adapter, &info);
+		client = i2c_new_client_device(this->i2c_client->adapter, &info);
 		// client = i2c_new_probed_device(this->i2c_client->adapter, &info);
 		if (IS_ERR(client)) {
 			dev_err(dev, "Failed to registering %pOF\n", i2c_dev);

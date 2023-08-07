@@ -6,13 +6,13 @@ menu "Technexion overlay Encoders, decoders, sensors and other helper chips"
 config VIDEO_VIZION_LINK
 	tristate "VIZIONLINK support"
 	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
-	---help---
+	help
 	  This is a Video4Linux2 driver for the VIZIONLINK
 
- config VIDEO_TEVI_AR0144
+config VIDEO_TEVI_AR0144
  	tristate "TEVI-AR0144 camera sensor support"
  	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
- 	---help---
+	help
  	  This is a Video4Linux2 sensor-level driver for the Onsemi
  	  AR0144 camera sensor
 
@@ -22,7 +22,7 @@ config VIDEO_VIZION_LINK
 config VIDEO_TEVI_AP1302
 	tristate "TEVI-AP1302 camera sensor support"
 	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
-	---help---
+	help
 	  This is a Video4Linux2 sensor-level driver for the Onsemi
 	  AP1302 camera sensor
 
@@ -32,7 +32,7 @@ config VIDEO_TEVI_AP1302
 config VIDEO_TEVI_OV5640
 	tristate "TEVI-OV5640 camera sensor support"
 	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
-	---help---
+	help
 	  This is a Video4Linux2 sensor-level driver for the OnmiVision
 	  OV5640 camera sensor
 
