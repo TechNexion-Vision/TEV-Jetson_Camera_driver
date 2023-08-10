@@ -806,7 +806,6 @@ static int sensor_board_setup(struct sensor_obj *priv)
 	//non-continuous clock,2 lane
 	sensor_i2c_write_16b(priv->tc_dev->client, 0x2030,
 			     0x10 | (continuous_clock << 5) | (data_lanes)); //VIDEO_HINF_CTRL
-	sensor_i2c_write_16b(priv->tc_dev->client, 0x2032, 0); //HINF_SPOOF_W
 	sensor_i2c_write_16b(priv->tc_dev->client, 0x1184, 0xb); //ATOMIC
 
 	//let ap1302 go to standby mode
