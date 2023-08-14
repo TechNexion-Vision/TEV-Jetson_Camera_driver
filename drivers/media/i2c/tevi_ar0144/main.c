@@ -1,4 +1,4 @@
-#define DEBUG
+// #define DEBUG
 #include <linux/slab.h>
 #include <linux/uaccess.h>
 #include <linux/gpio.h>
@@ -24,8 +24,10 @@ MODULE_DEVICE_TABLE(of, __of_match);
  * device tree!
  */
 static const int __30fps = 30;
+static const int __15fps = 15;
 static const struct camera_common_frmfmt sensor_frmfmt[] = {
 	{{1280, 800}, &__30fps, 1, 0, 0 /* number depend on dts mode list */},
+	{{1280, 720}, &__30fps, 2, 0, 0 /* number depend on dts mode list */},
 };
 
 static const u32 ctrl_cid_list[] = {
@@ -35,11 +37,15 @@ struct sensor_obj {
 	struct v4l2_subdev		*subdev;
 	struct camera_common_data	*s_data;
 	struct tegracam_device		*tc_dev;
+	struct i2c_client         *dser_i2c;
 	void				*otp_flash_instance;
 	u32				frame_length;
+	u32             vc_id;
+	u32             gpio_addr;
+	u32             ser_alias_id;
 };
 
-static int __i2c_read_8b(struct i2c_client *client, u8 reg, u8 *val, u8 size)
+static int ar0144_i2c_read_8b(struct i2c_client *client, u8 reg, u8 *val, u8 size)
 {
 	dev_dbg(&client->dev, "read reg 0x%x, size %d\n", reg, size);
 
@@ -54,7 +60,7 @@ __except:
 	return -EIO;
 }
 
-static int __i2c_read(struct i2c_client *client, u16 reg, u8 *val, u8 size)
+static int ar0144_i2c_read(struct i2c_client *client, u16 reg, u8 *val, u8 size)
 {
 	struct i2c_msg msg[2];
 	u8 buf[2];
@@ -85,12 +91,12 @@ static int __i2c_read(struct i2c_client *client, u16 reg, u8 *val, u8 size)
 	//return i2c_transfer(client->adapter, msg, 2);
 }
 
-static int __i2c_read_16b(struct i2c_client *client, u16 reg, u16 *value)
+static int ar0144_i2c_read_16b(struct i2c_client *client, u16 reg, u16 *value)
 {
 	u8 v[2] = {0,0};
 	int ret;
 
-	ret = __i2c_read(client, reg, v, 2);
+	ret = ar0144_i2c_read(client, reg, v, 2);
 
 	if (unlikely(ret < 0)) {
 		dev_err(&client->dev, "i2c[R16] transfer error. addr=%x, reg=%x, val=%x\n", client->addr, reg, *value);
@@ -170,6 +176,11 @@ static int __i2c_write_bust(struct i2c_client *client, u8 *buf, size_t len)
 	msg.buf = buf;
 	msg.len = len;
 
+	// client->adapter->timeout = 0x7fffffff;
+	// client->adapter->retries = 10;
+	// dev_info(&client->dev, "%s(): addr=0x%02x%02x, data=0x%02x%02x\n", 
+	// 			msg.buf, (msg.buf + 1), (msg.buf + 2), (msg.buf + 3));
+
 	ret = i2c_transfer(client->adapter, &msg, 1);
 	if (ret < 0)
 	{
@@ -180,13 +191,44 @@ static int __i2c_write_bust(struct i2c_client *client, u8 *buf, size_t len)
 	return 0;
 }
 
-// static int __extend_gpio_setting(struct i2c_client *client)
+// static int __extend_ub953_setting(struct i2c_client *client, struct sensor_obj *priv)
+// {
+// 	int ret;
+// 	int count = 0;
+// 	u8 v = 0;
+// 	u8 old_addr = client->addr;
+
+// 	dev_dbg(&client->dev, "%s(): ser_id: 0x%02x\n", __func__, priv->ser_alias_id);
+// 	client->addr = priv->ser_alias_id;
+// 	ret = __i2c_write_8b(client, 3, 0x5b);
+// 	msleep(500);
+
+// 	ar0144_i2c_read_8b(client, 0x3, &v, 1);
+
+// 	while((v & 0x13) != 0x13){
+// 		if(count++ > 10){
+// 			dev_err(&client->dev, "Set Async Mode Fail!\n");
+// 			return -EINVAL;
+// 		}
+// 		// __i2c_write(client, ser_alias_addr, 3, v | 0x12);
+// 		__i2c_write_8b(client, 3, v | 0x13);
+// 		msleep(50);
+// 		// ar0144_i2c_read(client, ser_alias_addr, 3, &v, 1);
+// 		ar0144_i2c_read_8b(client, 0x3, &v, 1);
+// 	}
+
+// 	client->addr = old_addr;
+
+// 	return ret;
+// }
+
+// static int __extend_gpio_setting(struct i2c_client *client, struct sensor_obj *priv)
 // {
 // 	int ret;
 // 	u8 old_addr = client->addr;
 
 // 	dev_dbg(&client->dev, "%s()\n", __func__);
-// 	client->addr = 0x21; //TN238 extend gpio chip i2c address
+// 	client->addr = priv->gpio_addr; //TN238 extend gpio chip i2c address
 // 	ret = __i2c_write_8b(client, 3, 0xFA);
 // 	ret = __i2c_write_8b(client, 1, 1);
 // 	client->addr = old_addr;
@@ -196,10 +238,14 @@ static int __i2c_write_bust(struct i2c_client *client, u8 *buf, size_t len)
 
 static const struct regmap_config sensor_regmap_config = {
 	.reg_bits = 16,
-	.val_bits = 8,
+	.val_bits = 16,
 	.cache_type = REGCACHE_RBTREE,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0)
+	.use_single_rw = true,
+#else
 	.use_single_read = true,
 	.use_single_write = true,
+#endif
 };
 
 // static struct tegracam_ctrl_ops sensor_ctrl_ops = {
@@ -207,75 +253,134 @@ static const struct regmap_config sensor_regmap_config = {
 // 	.ctrl_cid_list = ctrl_cid_list,
 // };
 
-static int sensor_standby(struct i2c_client *client, int enable)
+static int set_standby_mode_rel419(struct i2c_client *client, int enable)
 {
 	u16 v = 0;
 	int timeout;
-	dev_info(&client->dev, "%s()\n", __func__);
+	dev_dbg(&client->dev, "%s():enable=%d\n", __func__, enable);
 
 	if (enable == 1) {
-		__i2c_write_16b(client, 0x601a, 0x140);
+		__i2c_write_16b(client, 0x601a, 0x8140);
 		for (timeout = 0 ; timeout < 50 ; timeout ++) {
 			usleep_range(9000, 10000);
-			__i2c_read_16b(client, 0x601a, &v);
+			ar0144_i2c_read_16b(client, 0x601a, &v);
 			if ((v & 0x200) == 0x200)
 				break;
 		}
 		if (timeout < 50) {
 			__i2c_write_16b(client, 0xFFFE, 1);
-			msleep(1);
+			msleep(100);
 		} else {
 			dev_err(&client->dev, "timeout: line[%d]\n", __LINE__);
 			return -EINVAL;
 		}
-	} else {
+	}  else {
 		__i2c_write_16b(client, 0xFFFE, 0);
-		for (timeout = 0 ; timeout < 50 ; timeout ++) {
+		for (timeout = 0 ; timeout < 500 ; timeout ++) {
 			usleep_range(9000, 10000);
-			__i2c_read_16b(client, 0, &v);
+			ar0144_i2c_read_16b(client, 0, &v);
 			if (v != 0)
 				break;
 		}
-		if (timeout >= 50) {
-			dev_err(&client->dev, "timeout: line[%d]\n", __LINE__);
+		if (timeout >= 500) {
+			dev_err(&client->dev, "timeout: line[%d]v=%x\n", __LINE__, v);
 			return -EINVAL;
+		}
+
+		for (timeout = 0 ; timeout < 100 ; timeout ++) {
+			usleep_range(9000, 10000);
+			ar0144_i2c_read_16b(client, 0x601a, &v);
+			if ((v & 0x200) == 0x200)
+				break;
+		}
+		if ( (v & 0x200) != 0x200 ) {
+			dev_dbg(&client->dev, "stop waking up: camera is working.\n");
+			return 0;
 		}
 
 		__i2c_write_16b(client, 0x601a, 0x241);
 		usleep_range(1000, 2000);
-		for (timeout = 0 ; timeout < 10 ; timeout ++) {
+		for (timeout = 0 ; timeout < 100 ; timeout ++) {
 			usleep_range(9000, 10000);
-			__i2c_read_16b(client, 0x601a, &v);
+			ar0144_i2c_read_16b(client, 0x601a, &v);
 			if ((v & 1) == 0)
 				break;
 		}
-		if (timeout >= 10) {
-			dev_err(&client->dev, "timeout: line[%d]\n", __LINE__);
+		if (timeout >= 100) {
+			dev_err(&client->dev, "timeout: line[%d]v=%x\n", __LINE__, v);
 			return -EINVAL;
 		}
 
-		for (timeout = 0 ; timeout < 10 ; timeout ++) {
+		for (timeout = 0 ; timeout < 100 ; timeout ++) {
 			usleep_range(9000, 10000);
-			__i2c_read_16b(client, 0x601a, &v);
+			ar0144_i2c_read_16b(client, 0x601a, &v);
 			if ((v & 0x8000) == 0x8000)
 				break;
 		}
-		if (timeout >= 10) {
-			dev_err(&client->dev, "timeout: line[%d]\n", __LINE__);
+		if (timeout >= 100) {
+			dev_err(&client->dev, "timeout: line[%d]v=%x\n", __LINE__, v);
 			return -EINVAL;
 		}
 
-		__i2c_write_16b(client, 0x601a, v | 0x10);
-		for (timeout = 0 ; timeout < 10 ; timeout ++) {
+		__i2c_write_16b(client, 0x601a, 0x8250);
+		for (timeout = 0 ; timeout < 100 ; timeout ++) {
 			usleep_range(9000, 10000);
-			__i2c_read_16b(client, 0x601a, &v);
-			if (v == 0x8040)
+			ar0144_i2c_read_16b(client, 0x601a, &v);
+			if ((v & 0x8040) == 0x8040)
 				break;
 		}
-		if (timeout >= 10) {
-			dev_err(&client->dev, "timeout: line[%d]\n", __LINE__);
+		if (timeout >= 100) {
+			dev_err(&client->dev, "timeout: line[%d]v=%x\n", __LINE__, v);
 			return -EINVAL;
 		}
+
+		dev_dbg(&client->dev, "sensor wake up\n");
+	}
+
+	return 0;
+}
+
+static int sensor_standby(struct i2c_client *client, int enable)
+{
+	u16 v = 0;
+	int timeout;
+	u16 checksum = 0;
+	dev_dbg(&client->dev, "%s():enable=%d\n", __func__, enable);
+
+	for (timeout = 0 ; timeout < 50 ; timeout ++) {
+		usleep_range(9000, 10000);
+		ar0144_i2c_read_16b(client, 0x6134, &checksum);
+		if (checksum == 0xFFFF)
+			break;
+	}
+
+	if(checksum != 0xFFFF){
+		return set_standby_mode_rel419(client, enable); // standby for rel419
+	}
+
+	if (enable == 1) {
+		__i2c_write_16b(client, 0x601a, 0x0180);
+		for (timeout = 0 ; timeout < 50 ; timeout ++) {
+			usleep_range(9000, 10000);
+			ar0144_i2c_read_16b(client, 0x601a, &v);
+			if ((v & 0x200) == 0x200)
+				break;
+		}
+	}  else {
+		__i2c_write_16b(client, 0x601a, 0x0380);
+		usleep_range(1000, 2000);
+		for (timeout = 0 ; timeout < 100 ; timeout ++) {
+			usleep_range(9000, 10000);
+			ar0144_i2c_read_16b(client, 0x601a, &v);
+			if ((v & 0x200) == 0)
+				break;
+		}
+		if (timeout >= 100) {
+			dev_err(&client->dev, "timeout: line[%d]v=%x\n", __LINE__, v);
+			return -EINVAL;
+		}
+
+		dev_dbg(&client->dev, "sensor wake up\n");
 	}
 
 	return 0;
@@ -506,6 +611,7 @@ static int sensor_power_get(struct tegracam_device *tc_dev)
 	if (err < 0) {
 		dev_err(dev, "%s() unable to request power_gpio (%d)\n",
 			__func__, err);
+		err = 0;  // Pass Error
 		goto done;
 	}
 
@@ -514,6 +620,7 @@ static int sensor_power_get(struct tegracam_device *tc_dev)
 	if (err < 0) {
 		dev_err(dev, "%s() unable to request reset_gpio (%d)\n",
 			__func__, err);
+		err = 0;  // Pass Error
 		goto done;
 	}
 
@@ -529,13 +636,15 @@ static struct camera_common_pdata *sensor_parse_dt(
 	struct device_node *np = dev->of_node;
 	struct camera_common_pdata *board_priv_pdata;
 	struct camera_common_pdata *ret = NULL;
+	struct sensor_obj * priv = (struct sensor_obj*)tc_dev->priv;
 	int err = 0;
 	int gpio;
 
 	struct device_node *dser_node;
-	struct i2c_client *dser_i2c = NULL;
+	struct i2c_client *dser_i2c;
 	u32 port_idx = 4;
 	u32 ser_alias_id = 0;
+	u32 gpio_addr = 0x25;
 	u8 dser_i2c_val = 0x7F;
 	u32 dser_time = 0;
 
@@ -563,6 +672,7 @@ static struct camera_common_pdata *sensor_parse_dt(
 
 	if (dser_i2c == NULL) {
 		dev_err(dev, "missing deserializer dev handle\n");
+		ret = ERR_PTR(-EPROBE_DEFER);
 		goto error;
 	}
 	if (dser_i2c->dev.driver == NULL) {
@@ -570,6 +680,7 @@ static struct camera_common_pdata *sensor_parse_dt(
 		goto error;
 	}
 	dev_info(dev, "dser_i2c at addr 0x%0x\n", dser_i2c->addr);
+	priv->dser_i2c = dser_i2c;
 
 	err = of_property_read_u32(dser_node, "ser_alias_id", &ser_alias_id);
 	if (err) {
@@ -577,6 +688,7 @@ static struct camera_common_pdata *sensor_parse_dt(
 		goto error;
 	}
 	dev_info(dev, "Read ser_alias_id %d\n", ser_alias_id);
+	priv->ser_alias_id = ser_alias_id;
 
 	err = of_property_read_u32(dser_node, "port", &port_idx);
 	if (err) {
@@ -592,15 +704,16 @@ static struct camera_common_pdata *sensor_parse_dt(
 
 	while(dser_time < 10) {
 		dev_info(dev, "Select port %d...\n", port_idx);
+		priv->vc_id = port_idx;
 		__i2c_write_8b(dser_i2c, 0x4c,
 						(port_idx << 4) | 
 						(1 << port_idx));
 		msleep(500);
-		__i2c_read_8b(dser_i2c, 0x4d, &dser_i2c_val, 1);
+		ar0144_i2c_read_8b(dser_i2c, 0x4d, &dser_i2c_val, 1);
 		dev_info(dev, "Read 0x4D=0x%x...\n", dser_i2c_val);
 		msleep(100);
 		if((dser_i2c_val & 0x7) == 3){
-			__i2c_read_8b(dser_i2c, 0x5b, &dser_i2c_val, 1);
+			ar0144_i2c_read_8b(dser_i2c, 0x5b, &dser_i2c_val, 1);
 			__i2c_write_8b(dser_i2c, 0x5c,
 				    ser_alias_id << 1);
 			msleep(100);
@@ -608,6 +721,15 @@ static struct camera_common_pdata *sensor_parse_dt(
 		}
 		dser_time++;
 	}
+
+	err = of_property_read_u32_index(dser_node, 
+						"i2c_addr_alias_map_local", 0,
+						 &gpio_addr);
+	if (err) {
+		dev_err(dev, "cannot found gpio_addr on %pOF from idx 0\n", dser_node);
+		goto error;
+	}
+	priv->gpio_addr = gpio_addr;
 	/*=====================================================*/
 	dev_info(dev, "%s():np_name=%s\n", __func__, np->name);
 	gpio = of_get_named_gpio(np, "power-gpios", 0);
@@ -615,7 +737,7 @@ static struct camera_common_pdata *sensor_parse_dt(
 		if (gpio == -EPROBE_DEFER)
 			ret = ERR_PTR(-EPROBE_DEFER);
 		dev_err(dev, "power-gpios not found\n");
-		goto error;
+		// goto error;
 	}
 	board_priv_pdata->pwdn_gpio = (unsigned int)gpio;
 
@@ -624,9 +746,10 @@ static struct camera_common_pdata *sensor_parse_dt(
 		if (gpio == -EPROBE_DEFER)
 			ret = ERR_PTR(-EPROBE_DEFER);
 		dev_err(dev, "reset-gpios not found\n");
-		goto error;
+		// goto error;
 	}
 	board_priv_pdata->reset_gpio = (unsigned int)gpio;
+	gpio_direction_output(board_priv_pdata->reset_gpio, 1);
 
 	err = of_property_read_string(np, "mclk", &board_priv_pdata->mclk_name);
 	if (err)
@@ -668,9 +791,18 @@ static int sensor_set_mode(struct tegracam_device *tc_dev)
 
 static int sensor_start_streaming(struct tegracam_device *tc_dev)
 {
-	dev_dbg(tc_dev->dev, "%s()\n", __func__);
+	int ret = 0;
+	dev_info(tc_dev->dev, "%s()\n", __func__);
 
-	return sensor_standby(tc_dev->client, 0);
+	ret = sensor_standby(tc_dev->client, 0);
+
+	if (ret == 0) {
+		int fps = 15;
+		// VIDEO_MAX_FPS
+		__i2c_write_16b(tc_dev->client, 0x2020, fps << 8);
+	}
+
+	return ret;
 }
 
 static int sensor_stop_streaming(struct tegracam_device *tc_dev)
@@ -699,16 +831,16 @@ static int sensor_load_bootdata(struct sensor_obj *priv)
 {
 	struct device *dev = priv->tc_dev->dev;
 	int index = 0;
-	size_t len = 0;
-	size_t pll_len = 0;
+
 	u16 otp_data;
 	u16 *bootdata_temp_area;
 	u16 checksum;
 	int i;
 	const int len_each_time = 1024;
+	size_t len = len_each_time;
 
 	bootdata_temp_area = devm_kzalloc(dev,
-					  len_each_time + 2,
+					  len_each_time * 4 + 2,
 					  GFP_KERNEL);
 	if (bootdata_temp_area == NULL) {
 		dev_err(dev, "allocate memory failed\n");
@@ -717,27 +849,6 @@ static int sensor_load_bootdata(struct sensor_obj *priv)
 
 	checksum = tevi_ar0144_otp_flash_get_checksum(priv->otp_flash_instance);
 
-	//load pll
-	bootdata_temp_area[0] = cpu_to_be16(BOOT_DATA_START_REG);
-	pll_len = tevi_ar0144_otp_flash_get_pll_section(priv->otp_flash_instance,
-					    (u8 *)(&bootdata_temp_area[1]));
-	dev_dbg(dev, "load pll data of length [%zu] into register [%x]\n",
-		pll_len, BOOT_DATA_START_REG);
-	__i2c_write_bust(priv->tc_dev->client, (u8 *)bootdata_temp_area, pll_len + 2);
-	__i2c_write_16b(priv->tc_dev->client, 0x6002, 2);
-	msleep(1);
-
-	//load bootdata part1
-	bootdata_temp_area[0] = cpu_to_be16(BOOT_DATA_START_REG + pll_len);
-	len = tevi_ar0144_otp_flash_read(priv->otp_flash_instance,
-			     (u8 *)(&bootdata_temp_area[1]),
-			     pll_len, len_each_time - pll_len);
-	dev_dbg(dev, "load data of length [%zu] into register [%zx]\n",
-		len, BOOT_DATA_START_REG + pll_len);
-	__i2c_write_bust(priv->tc_dev->client, (u8 *)bootdata_temp_area, len + 2);
-	i = index = pll_len + len;
-
-	//load bootdata ronaming
 	while(len != 0) {
 		while(i < BOOT_DATA_WRITE_LEN) {
 			bootdata_temp_area[0] =
@@ -767,11 +878,13 @@ static int sensor_load_bootdata(struct sensor_obj *priv)
 	__i2c_write_16b(priv->tc_dev->client, 0x6002, 0xffff);
 	devm_kfree(dev, bootdata_temp_area);
 
+	msleep(500);
+
 	index = 0;
 	otp_data = 0;
 	while(otp_data != checksum && index < 20) {
 		msleep(10);
-		__i2c_read_16b(priv->tc_dev->client, 0x6134, &otp_data);
+		ar0144_i2c_read_16b(priv->tc_dev->client, 0x6134, &otp_data);
 		index ++;
 	}
 	if (unlikely(index == 20)) {
@@ -793,6 +906,7 @@ static int sensor_board_setup(struct sensor_obj *priv)
 	struct camera_common_power_rail *pw = s_data->power;
 	struct device *dev = s_data->dev;
 	u16 chipid = 0;
+	u32  port_idx = priv->vc_id;
 	int err = 0;
 
 	if (pdata->mclk_name) {
@@ -806,27 +920,28 @@ static int sensor_board_setup(struct sensor_obj *priv)
 	if (!(pw->reset_gpio && pw->pwdn_gpio)) {
 		dev_err(dev, "error the power and reset gpio define\n");
 		err = -EIO;
-		goto done;
+		goto pass;
 	}
 
 	gpio_set_value_cansleep(pw->reset_gpio, 0);
-	gpio_set_value_cansleep(pw->pwdn_gpio, 1);
-	msleep(10);
+	// gpio_set_value_cansleep(pw->pwdn_gpio, 1);
+	msleep(500);
 
 	//To make tevi-ar0144 work on jetson nano platform,
 	//it must be equipped with TN238 adapter.
 	//TN238 adapter include one extend gpio chip.
 	//Some gpio controll pin of tevi-ar0144 assign to this chip
-	// err = __extend_gpio_setting(priv->tc_dev->client);
+	// err = __extend_gpio_setting(priv->tc_dev->client, priv);
 	// if (err) {
 	// 	dev_err(dev, "%s() error initial extend gpio chip\n",
 	// 		__func__);
 	// 	goto err_reg_probe;
 	// }
 	gpio_set_value_cansleep(pw->reset_gpio, 1);
-	msleep(300);
-	
-	err = __i2c_read_16b(priv->tc_dev->client, 0, &chipid);
+pass:
+	msleep(500);
+
+	err = ar0144_i2c_read_16b(priv->tc_dev->client, 0, &chipid);
 	if (err) {
 		dev_err(dev, "%s() error during i2c read probe (%d)\n",
 			__func__, err);
@@ -853,25 +968,43 @@ static int sensor_board_setup(struct sensor_obj *priv)
 		goto err_reg_probe;
 	}
 
+	// // switch to non-sync mode
+	// msleep(50);
+	// __i2c_write_8b(priv->dser_i2c, 0x58, 0x5A);
+	// msleep(500);
+	// __extend_ub953_setting(priv->dser_i2c, priv);
+
 	////set something reference from DevX tool register log
 	//cntx select 'Video'
 	__i2c_write_16b(priv->tc_dev->client, 0x1184, 1); //ATOMIC
-	__i2c_write_16b(priv->tc_dev->client, 0x1000, 2); //CTRL
+	__i2c_write_16b(priv->tc_dev->client, 0x1000, 0); //CTRL
 	__i2c_write_16b(priv->tc_dev->client, 0x1184, 0xb); //ATOMIC
 	msleep(1);
 	__i2c_write_16b(priv->tc_dev->client, 0x1184, 1); //ATOMIC
 	//Video output 1280x800,YUV422
-	__i2c_write_16b(priv->tc_dev->client, 0x4000, 1280); //VIDEO_WIDTH
-	__i2c_write_16b(priv->tc_dev->client, 0x4002, 800); //VIDEO_HEIGHT
+	__i2c_write_16b(priv->tc_dev->client, 0x2000, 1280); //VIDEO_WIDTH
+	__i2c_write_16b(priv->tc_dev->client, 0x2002, 800); //VIDEO_HEIGHT
 	//__i2c_write_16b(priv->tc_dev->client, 0x4012, 0x50); //VIDEO_OUT_FMT
 	//Video max fps 30
-	__i2c_write_16b(priv->tc_dev->client, 0x4020, 0x1E00); //VIDEO_MAX_FPS
+	__i2c_write_16b(priv->tc_dev->client, 0x2020, 0x0F00); //VIDEO_MAX_FPS
 	//non-continuous clock,2 lane
-	__i2c_write_16b(priv->tc_dev->client, 0x4030, 0x12); //VIDEO_HINF_CTRL
+	dev_info(dev, "%s():set ISP vc_id: %d", __func__, port_idx);
+	// __i2c_write_16b(priv->tc_dev->client, 0x2016, 0x303F | (port_idx << 6)); //VIDEO_HINF_CTRL
+	__i2c_write_16b(priv->tc_dev->client, 0x2030, 0x1a); //VIDEO_HINF_CTRL
 	//__i2c_write_16b(priv->tc_dev->client, 0x4014, 0); //VIDEO_SENSOR_MODE
+	__i2c_write_16b(priv->tc_dev->client, 0x100C, 0x03); //VIDEO_HINF_CTRL
+	// __i2c_write_16b(priv->tc_dev->client, 0x6132, 0x3E00); //THROUGHPUT_LIMIT
 	__i2c_write_16b(priv->tc_dev->client, 0x1184, 0xb); //ATOMIC
 	////let ap1302 go to standby mode
-	return sensor_standby(priv->tc_dev->client, 1);
+	err = sensor_standby(priv->tc_dev->client, 1);
+
+	// switch to non-sync mode
+	// msleep(50);
+	// __i2c_write_8b(priv->dser_i2c, 0x58, 0x5A);
+	// msleep(100);
+	// __extend_ub953_setting(priv->dser_i2c, priv);
+
+	return err;
 
 err_reg_probe:
 	gpio_set_value_cansleep(pw->reset_gpio, 0);
@@ -920,6 +1053,7 @@ static int __probe(struct i2c_client *client, const struct i2c_device_id *id)
 
 	tc_dev->client = client;
 	tc_dev->dev = dev;
+	tc_dev->priv = (void*)priv;
 	tc_dev->dev_regmap_config = &sensor_regmap_config;
 	tc_dev->sensor_ops = &sensor_common_ops;
 	tc_dev->v4l2sd_internal_ops = &sensor_subdev_internal_ops;
