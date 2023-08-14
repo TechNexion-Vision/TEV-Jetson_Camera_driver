@@ -10,6 +10,7 @@ struct __reg8b_v {
 };
 
 static struct __reg8b_v __i2c_setting[] = {
+	// {0x05, 0x0B},
 	{0x0B, 0x06},
 	{0x0C, 0x0B},
 	{0x0D, 0x00},
@@ -81,22 +82,23 @@ int vc_init(struct i2c_client *client, u8 ser_alias_addr)
 	u8 v = 0;
 	int ret = 0;
 	int i = 0;
-	int count = 0;
+	// int count = 0;
 
 	//90953 Digital Reset
 	__i2c_write(client, ser_alias_addr, 1, 3);
 	msleep(20);
 	__i2c_read(client, ser_alias_addr, 3, &v, 1);
 
-	while((v & 0x13) != 0x13){
-		if(count++ > 10){
-			dev_err(&client->dev, "Set Async Mode Fail!\n");
-			return -EINVAL;
-		}
-		__i2c_write(client, ser_alias_addr, 3, v | 0x13);
-		msleep(50);
-		__i2c_read(client, ser_alias_addr, 3, &v, 1);
-	}
+	// while((v & 0x13) != 0x13){
+	// 	if(count++ > 10){
+	// 		dev_err(&client->dev, "Set Async Mode Fail!\n");
+	// 		return -EINVAL;
+	// 	}
+	// 	__i2c_write(client, ser_alias_addr, 3, v | 0x13);
+	// 	msleep(50);
+	// 	__i2c_read(client, ser_alias_addr, 3, &v, 1);
+	// }
+	// msleep(200);
 
 	__i2c_read(client, ser_alias_addr, 3, &v, 1);
 	while ((v & 0x8) != 0x8) {

@@ -20,12 +20,12 @@ struct __reg8b_v {
 };
 
 static struct __reg8b_v __9096x_i2c_setting [] = {
-	{.reg = 0x02, .value = 0x1E}, //GENERAL_CFG
+	{.reg = 0x02, .value = 0x3E}, //GENERAL_CFG
 	{.reg = 0x07, .value = 0xFE}, //BCC Watchdog Control
 	{.reg = 0x08, .value = 0x1C}, //I2C Control 1
 	{.reg = 0x09, .value = 0x10}, //I2C Control 2
-	{.reg = 0x0A, .value = 0x06}, //SCL High Time
-	{.reg = 0x0B, .value = 0x0C}, //SCL Low Time
+	{.reg = 0x0A, .value = 0x7a}, //SCL High Time
+	{.reg = 0x0B, .value = 0x7a}, //SCL Low Time
 	{.reg = 0x0D, .value = 0xB9}, //IO_CTL
 
 	{.reg = 0x32, .value = 0x01}, //CSI_PORT_SEL
@@ -34,30 +34,53 @@ static struct __reg8b_v __9096x_i2c_setting [] = {
 
 	//Port config/setting
 	{.reg = 0x4C, .value = 0x01}, //FPD3_PORT_SEL,Port 0
-	{.reg = 0x58, .value = 0x5A}, //BCC_CONFIG
+	{.reg = 0x72, .value = 0x00}, //CSI_VC_MAP
+	{.reg = 0x6E, .value = 0xAA}, //BC_GPIO_CTL0
+	// {.reg = 0x0A, .value = 0x13}, //SCL High Time
+	// {.reg = 0x0B, .value = 0x25}, //SCL Low Time
+	{.reg = 0x58, .value = 0x5E}, //BCC_CONFIG
 	{.reg = 0x6D, .value = 0x7C}, //PORT_CONFIG
 	{.reg = 0x7C, .value = 0x38}, //PORT_CONFIG2
 	{.reg = 0x7D, .value = 0x80}, //PORT_PASS_CTL
 
 	{.reg = 0x4C, .value = 0x12}, //FPD3_PORT_SEL,Port 1
-	{.reg = 0x58, .value = 0x5A}, //BCC_CONFIG
+	{.reg = 0x72, .value = 0x55}, //CSI_VC_MAP
+	{.reg = 0x6E, .value = 0xAA}, //BC_GPIO_CTL0
+	// {.reg = 0x0A, .value = 0x13}, //SCL High Time
+	// {.reg = 0x0B, .value = 0x25}, //SCL Low Time
+	{.reg = 0x58, .value = 0x5E}, //BCC_CONFIG
 	{.reg = 0x6D, .value = 0x7C}, //PORT_CONFIG
 	{.reg = 0x7C, .value = 0x38}, //PORT_CONFIG2
 	{.reg = 0x7D, .value = 0x80}, //PORT_PASS_CTL
 
 	{.reg = 0x4C, .value = 0x24}, //FPD3_PORT_SEL,Port 2
-	{.reg = 0x58, .value = 0x5A}, //BCC_CONFIG
+	{.reg = 0x72, .value = 0xAA}, //CSI_VC_MAP
+	{.reg = 0x6E, .value = 0xAA}, //BC_GPIO_CTL0
+	// {.reg = 0x0A, .value = 0x13}, //SCL High Time
+	// {.reg = 0x0B, .value = 0x25}, //SCL Low Time
+	{.reg = 0x58, .value = 0x5E}, //BCC_CONFIG
 	{.reg = 0x6D, .value = 0x7C}, //PORT_CONFIG
 	{.reg = 0x7C, .value = 0x38}, //PORT_CONFIG2
 	{.reg = 0x7D, .value = 0x80}, //PORT_PASS_CTL
 
 	{.reg = 0x4C, .value = 0x38}, //FPD3_PORT_SEL,Port 3
-	{.reg = 0x58, .value = 0x5A}, //BCC_CONFIG
+	{.reg = 0x72, .value = 0xFF}, //CSI_VC_MAP
+	{.reg = 0x6E, .value = 0xAA}, //BC_GPIO_CTL0
+	// {.reg = 0x0A, .value = 0x13}, //SCL High Time
+	// {.reg = 0x0B, .value = 0x25}, //SCL Low Time
+	{.reg = 0x58, .value = 0x5E}, //BCC_CONFIG
 	{.reg = 0x6D, .value = 0x7C}, //PORT_CONFIG
 	{.reg = 0x7C, .value = 0x38}, //PORT_CONFIG2
 	{.reg = 0x7D, .value = 0x80}, //PORT_PASS_CTL
 
-	{.reg = 0xB0, .value = 0x1C}, //IND_ACC_CTL
+	// {.reg = 0x10, .value = 0x91}, //FS_HIGH_TIME_1
+	// {.reg = 0x19, .value = 0x0A}, //FS_HIGH_TIME_1
+	// {.reg = 0x1A, .value = 0xD7}, //FS_HIGH_TIME_0
+	// {.reg = 0x1B, .value = 0x61}, //FS_LOW_TIME_1
+	// {.reg = 0x1C, .value = 0xA0}, //FS_LOW_TIME_0
+	// {.reg = 0x18, .value = 0x01}, //FS_CTL
+
+	{.reg = 0xB0, .value = 0x1C}, // IND_ACC_CTL
 };
 
 static int __i2c_read(struct i2c_client *client, u8 reg, u8 *val, u8 size)
@@ -134,10 +157,10 @@ static int vh_init(struct vh_st *this)
 	dev_info(dev, "%s\n", __func__);
 
 	//9096x Digital Reset
-	 err = __i2c_write(this->i2c_client, 0x01, 0x03);
-	 if (err != 0)
-	 	return -EIO;
-	 msleep(20);
+	// err = __i2c_write(this->i2c_client, 1, 3);
+	// if (err != 0)
+	// 	return -EIO;
+	// msleep(20);
 
 	for (i = 0 ; i < ARRAY_SIZE(__9096x_i2c_setting) ; i++) {
 		err = __i2c_write(this->i2c_client,
@@ -155,31 +178,35 @@ static int vh_check_port_lock_pass(struct vh_st *this)
 {
 	struct device *dev = &this->i2c_client->dev;
 	u8 v = 0;
-	u32 vc_port;
+	u32 vc_port = 0;
 	int ret = -1;
 	dev_info(dev, "%s\n", __func__);
 
-	for (vc_port = 0; vc_port < 4; vc_port++) {
-		dev_info(dev, "vc_port=0x%x, addr=%x\n", vc_port, this->i2c_client->addr);
+	ret = of_property_read_u32(dev->of_node, "port", &vc_port);
+	if (ret) {
+		dev_err(dev, "of_i2c: invalid vc_port on %pOF\n", dev->of_node);
+		return ret;
+	}
+	dev_info(dev, "vc_port=0x%x, addr=%x\n", vc_port, this->i2c_client->addr);
 
-		__i2c_write(this->i2c_client, 0x4c, (vc_port << 4) | (1 << vc_port));
-		msleep(100);
-		__i2c_read(this->i2c_client, 0x4d, &v, 1);
+	__i2c_write(this->i2c_client, 0x4c, (vc_port << 4) | (1 << vc_port));
+	msleep(200);
+	__i2c_read(this->i2c_client, 0x4d, &v, 1);
 
-		if ((v & 0x7) == 3) {
-			__i2c_read(this->i2c_client, 0x5b, &v, 1);
-			__i2c_write(this->i2c_client, 0x5c,
+	if ((v & 0x7) == 3) {
+		__i2c_read(this->i2c_client, 0x5b, &v, 1);
+		__i2c_write(this->i2c_client, 0x5c,
 				    this->ser_alias_addr << 1);
-			this->connect_port = vc_port;
-			dev_info(dev,
-				 "Port %d pass and lock.Serializer addr 0x%x, alias to 0x%x\n",
+		this->connect_port = vc_port;
+		dev_info(dev,
+				"Port %d pass and lock.Serializer addr 0x%x, alias to 0x%x\n",
 				 this->connect_port,
 				 v >> 1,
 				 this->ser_alias_addr);
-			ret = 0;
-		} else {
-			dev_dbg(dev, "Port %d disconnect:0x4D=%x\n", vc_port, v);
-		}
+		ret = 0;
+	} else {
+		dev_info(dev, "Port %d disconnect:0x4D=%x\n", vc_port, v);
+		ret = -EIO;
 	}
 
 	return ret;
@@ -189,7 +216,7 @@ static int vh_polling_connect(struct vh_st *this)
 {
 	int state_flag = 0;
 	u8 v = 0;
-	int retry_time = 30;
+	int retry_time = 20;
 	dev_info(&this->i2c_client->dev, "%s\n", __func__);
 
 	while (state_flag != -1 && retry_time != 0) {
@@ -293,11 +320,6 @@ static int vh_setting_i2c_alias_map(struct vh_st *this)
 	return 0;
 }
 
-#define I2C_TEN_BIT_ADDRESS	(1 << 31)
-#define I2C_OWN_SLAVE_ADDRESS	(1 << 30)
-
-#define I2C_CLIENT_HOST_NOTIFY	0x40	/* We want to use I2C host notify */
-
 static int vh_append_i2c_device(struct vh_st *this)
 {
 	struct device *dev = &this->i2c_client->dev;
@@ -388,11 +410,13 @@ static int vh_configure_des_csi(struct vh_st *this)
 	temp2 |= 1;
 	__i2c_write(this->i2c_client, 0x33, temp2);
 	//0x34 //Enable CSI-2 Periodic Calibration (if desired) in the CSI_CTL2 register
+	// __i2c_write(this->i2c_client, 0x21, 0x2);
 	//0x20 //Enable Forwarding for assigned ports in the FWD_CTL1 register
 	__i2c_read(this->i2c_client, 0x20, &temp2, 1);
 	temp2 &= ~(1 << (this->connect_port + 4));
 	// __i2c_write(this->i2c_client, 0x20, (0xf0 & ~(1 << (this->connect_port + 4))));
 	__i2c_write(this->i2c_client, 0x20, temp2);
+	// __i2c_write(this->i2c_client, 0x21, 0x6);
 
 	return 0;
 }
@@ -431,11 +455,11 @@ static int vh_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	obj->i2c_client->addr = addr;
 
 	obj->pdb_gpio = devm_gpiod_get(&client->dev, "pdb", GPIOD_OUT_LOW);
-
 	if (IS_ERR(obj->pdb_gpio)) {
 		dev_err(&client->dev,
 			"Failed to get gpio pin setting 'pdb'\n");
-			return -EINVAL;
+		dev_err(&client->dev,
+			"Bypass  gpio pin 'pdb'\n");
 	}
 
 	if (vh_is_exist(obj) != 0) {
