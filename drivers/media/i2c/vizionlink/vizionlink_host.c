@@ -193,7 +193,7 @@ static int vh_check_port_lock_pass(struct vh_st *this)
 	msleep(200);
 	__i2c_read(this->i2c_client, 0x4d, &v, 1);
 
-	if ((v & 0x7) == 3) {
+	if ((v & 0x1) == 1) {
 		__i2c_read(this->i2c_client, 0x5b, &v, 1);
 		__i2c_write(this->i2c_client, 0x5c,
 				    this->ser_alias_addr << 1);
