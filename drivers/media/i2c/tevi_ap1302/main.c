@@ -73,9 +73,8 @@ static const struct of_device_id sensor_of_match[] = {
 MODULE_DEVICE_TABLE(of, sensor_of_match);
 
 static const u32 ctrl_cid_list[] = {
-	TEGRA_CAMERA_CID_GAIN,
 	TEGRA_CAMERA_CID_FRAME_RATE,
-	// TEGRA_CAMERA_CID_SENSOR_MODE_ID,
+	TEGRA_CAMERA_CID_SENSOR_MODE_ID,
 };
 
 struct sensor_obj {
@@ -92,9 +91,15 @@ struct sensor_obj {
 	char *sensor_name;
 
 	struct mutex lock;	/* Protects formats */
-	/* V4L2 Controls */
-	struct v4l2_ctrl_handler ctrls;
 };
+
+struct sensor_obj* _to_sensor_obj_priv(struct v4l2_ctrl *ctrl)
+{
+	struct tegracam_ctrl_handler *ctrl_hdl = 
+			container_of(ctrl->handler, struct tegracam_ctrl_handler, ctrl_handler);
+	struct tegracam_device **tc_dev = &ctrl_hdl->tc_dev;
+	return container_of(tc_dev, struct sensor_obj, tc_dev);
+}
 
 static int sensor_i2c_read(struct i2c_client *client, u16 reg, u8 *val, u8 size)
 {
@@ -209,18 +214,11 @@ static int sensor_set_group_hold(struct tegracam_device *tc_dev, bool val)
 	return 0;
 }
 
-static int sensor_set_gain(struct tegracam_device *tc_dev, s64 val)
-{
-	return sensor_i2c_write_16b(tc_dev->client, AP1302_AE_MANUAL_GAIN, 
-				val & AP1302_AE_MANUAL_GAIN_MASK);
-}
-
 static struct tegracam_ctrl_ops sensor_nv_ctrl_ops = {
 	.numctrls = ARRAY_SIZE(ctrl_cid_list),
 	.ctrl_cid_list = ctrl_cid_list,
 	.set_frame_rate = sensor_set_frame_rate,
 	.set_group_hold = sensor_set_group_hold,
-	.set_gain = sensor_set_gain,
 };
 
 /* -----------------------------------------------------------------------------
@@ -687,7 +685,7 @@ static int ops_get_tilt_target(struct sensor_obj *priv, s32 *value)
 
 static int ops_s_ctrl(struct v4l2_ctrl *ctrl)
 {
-	struct sensor_obj *priv = container_of(ctrl->handler, struct sensor_obj, ctrls);
+	struct sensor_obj *priv = _to_sensor_obj_priv(ctrl);
 
 	switch (ctrl->id)
 	{
@@ -750,7 +748,7 @@ static int ops_s_ctrl(struct v4l2_ctrl *ctrl)
 
 static int ops_g_ctrl(struct v4l2_ctrl *ctrl)
 {
-	struct sensor_obj *priv = container_of(ctrl->handler, struct sensor_obj, ctrls);
+	struct sensor_obj *priv = _to_sensor_obj_priv(ctrl);
 
 	switch (ctrl->id)
 	{
@@ -987,16 +985,24 @@ static const struct v4l2_ctrl_config ops_ctrls[] = {
 
 static int ops_ctrls_init(struct sensor_obj *priv)
 {
+	struct tegracam_ctrl_handler *ctrl_hdl;
 	unsigned int i;
 	int ret;
 
-	ret = v4l2_ctrl_handler_init(&priv->ctrls, ARRAY_SIZE(ops_ctrls));
-	if (ret)
-		return ret;
+	ctrl_hdl = priv->s_data->tegracam_ctrl_hdl;
+
+	if(ctrl_hdl == NULL){
+		dev_info(&priv->tc_dev->client->dev,"init control handler...\n");
+		ret = v4l2_ctrl_handler_init(&ctrl_hdl->ctrl_handler, ARRAY_SIZE(ops_ctrls));
+		if (ret) {
+			dev_err(&priv->tc_dev->client->dev,"init handler fail\n");
+			return ret;
+		}
+	}
 
 	for (i = 0; i < ARRAY_SIZE(ops_ctrls); i++)
 	{
-		struct v4l2_ctrl * ctrl = v4l2_ctrl_new_custom(&priv->ctrls,
+		struct v4l2_ctrl * ctrl = v4l2_ctrl_new_custom(&ctrl_hdl->ctrl_handler,
 								&ops_ctrls[i], NULL);
 		ret = ops_g_ctrl(ctrl);
 		if (!ret && ctrl->default_value != ctrl->val) {
@@ -1008,16 +1014,16 @@ static int ops_ctrls_init(struct sensor_obj *priv)
 		}
 	}
 
-	if (priv->ctrls.error) {
+	if (ctrl_hdl->ctrl_handler.error) {
 		dev_err(&priv->tc_dev->client->dev, "ctrls error\n");
-		ret = priv->ctrls.error;
-		v4l2_ctrl_handler_free(&priv->ctrls);
+		ret = ctrl_hdl->ctrl_handler.error;
+		v4l2_ctrl_handler_free(&ctrl_hdl->ctrl_handler);
 		return ret;
 	}
 
 	/* Use same lock for controls as for everything else. */
-	priv->ctrls.lock = &priv->lock;
-	priv->subdev->ctrl_handler = &priv->ctrls;
+	ctrl_hdl->ctrl_handler.lock = &priv->lock;
+	priv->subdev->ctrl_handler = &ctrl_hdl->ctrl_handler;
 
 	return 0;
 }
