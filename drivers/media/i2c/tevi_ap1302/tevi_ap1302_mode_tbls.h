@@ -109,7 +109,7 @@ static struct sensor_info ap1302_sensor_table[] = {
 	},
 	{
 		.sensor_name = "TEVI-AR0522",
-		.frmfmt = ar0521_frmfmt,
+		.frmfmt = ar0522_frmfmt,
 		.res_list_size = ARRAY_SIZE(ar0522_frmfmt)
 	},
 	{
@@ -119,7 +119,7 @@ static struct sensor_info ap1302_sensor_table[] = {
 	},
 	{
 		.sensor_name = "TEVI-AR0822",
-		.frmfmt = ar0821_frmfmt,
+		.frmfmt = ar0822_frmfmt,
 		.res_list_size = ARRAY_SIZE(ar0822_frmfmt)
 	},
 	{

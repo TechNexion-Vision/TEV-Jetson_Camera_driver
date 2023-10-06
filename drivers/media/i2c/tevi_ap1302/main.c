@@ -1651,14 +1651,20 @@ static int sensor_board_setup(struct sensor_obj *priv)
 		s_data->numfmts = ARRAY_SIZE(ar0234_frmfmt);
 		break;
 	case TEVI_AP1302_AR0521:
-	case TEVI_AP1302_AR0522:
 		s_data->frmfmt = ar0521_frmfmt;
 		s_data->numfmts = ARRAY_SIZE(ar0521_frmfmt);
 		break;
+	case TEVI_AP1302_AR0522:
+		s_data->frmfmt = ar0522_frmfmt;
+		s_data->numfmts = ARRAY_SIZE(ar0522_frmfmt);
+		break;
 	case TEVI_AP1302_AR0821:
-	case TEVI_AP1302_AR0822:
 		s_data->frmfmt = ar0821_frmfmt;
 		s_data->numfmts = ARRAY_SIZE(ar0821_frmfmt);
+		break;
+	case TEVI_AP1302_AR0822:
+		s_data->frmfmt = ar0822_frmfmt;
+		s_data->numfmts = ARRAY_SIZE(ar0822_frmfmt);
 		break;
 	case TEVI_AP1302_AR1335:
 		s_data->frmfmt = ar1335_frmfmt;
