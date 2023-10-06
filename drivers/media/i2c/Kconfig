@@ -9,6 +9,16 @@ config VIDEO_VIZION_LINK
 	help
 	  This is a Video4Linux2 driver for the VIZIONLINK
 
+config VIDEO_TEVS
+ 	tristate "TEVS camera sensor support"
+ 	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
+	help
+ 	  This is a Video4Linux2 sensor-level driver for the Technexion 
+	  TEVS Camera
+
+ 	  To compile this driver as a module, choose M here: the module
+ 	  will be called tevs.
+
 config VIDEO_TEVI_AR0144
  	tristate "TEVI-AR0144 camera sensor support"
  	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
