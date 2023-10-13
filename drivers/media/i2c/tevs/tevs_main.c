@@ -298,7 +298,7 @@ static const u32 ctrl_cid_list[] = {
 
 static int tevs_set_group_hold(struct tegracam_device *tc_dev, bool val)
 {
-	/* TEVI-AP1302 does not support group hold */
+	/* TEVS does not support group hold */
 	return 0;
 }
 

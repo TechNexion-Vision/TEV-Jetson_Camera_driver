@@ -13,6 +13,81 @@
 
 #include "otp_flash.h"
 
+#define AP1302_BRIGHTNESS						(0x7000)
+#define AP1302_BRIGHTNESS_MASK					(0xFFFF)
+#define AP1302_CONTRAST							(0x7002)
+#define AP1302_CONTRAST_MASK					(0xFFFF)
+#define AP1302_SATURATION						(0x7006)
+#define AP1302_SATURATION_MASK					(0xFFFF)
+#define AP1302_AWB_CTRL_MODE					(0x5100)
+#define AP1302_AWB_CTRL_MODE_MASK				(0x00FF)
+#define AP1302_AWB_CTRL_MODE_MANUAL_TEMP 		(7U << 0)
+#define AP1302_AWB_CTRL_MODE_AUTO				(15U << 0)
+#define AP1302_AWB_CTRL_MODE_MANUAL_TEMP_IDX 	(0U << 0)
+#define AP1302_AWB_CTRL_MODE_AUTO_IDX			(1U << 0)
+#define AP1302_GAMMA							(0x700A)
+#define AP1302_GAMMA_MASK						(0xFFFF)
+#define AP1302_AE_MANUAL_EXP_TIME				(0x500C)
+#define AP1302_AE_MANUAL_EXP_TIME_MASK			(0xFFFFFFFF)
+#define AP1302_AE_MANUAL_GAIN					(0x5006)
+#define AP1302_AE_MANUAL_GAIN_MASK				(0xFFFF)
+#define AP1302_ORIENTATION						(0x100C)
+#define AP1302_ORIENTATION_HFLIP				(1U << 0)
+#define AP1302_ORIENTATION_VFLIP				(1U << 1)
+#define AP1302_AWB_MANUAL_TEMP					(0x510A)
+#define AP1302_AWB_MANUAL_TEMP_MASK				(0xFFFF)
+#define AP1302_SHARPEN							(0x7010)
+#define AP1302_SHARPEN_MASK						(0xFFFF)
+#define AP1302_BACKLIGHT_COMPENSATION 			(0x501A)
+#define AP1302_BACKLIGHT_COMPENSATION_MASK		(0xFFFF)
+#define AP1302_DZ_TGT_FCT						(0x1010)
+#define AP1302_DZ_TGT_FCT_MASK					(0xFFFF)
+#define AP1302_SFX_MODE							(0x1016)
+#define AP1302_SFX_MODE_SFX_MASK				(0x00FF)
+#define AP1302_SFX_MODE_SFX_NORMAL				(0U << 0)
+#define AP1302_SFX_MODE_SFX_BW					(3U << 0)
+#define AP1302_SFX_MODE_SFX_GRAYSCALE			(6U << 0)
+#define AP1302_SFX_MODE_SFX_NEGATIVE			(7U << 0)
+#define AP1302_SFX_MODE_SFX_SKETCH				(15U << 0)
+#define AP1302_SFX_MODE_SFX_NORMAL_IDX			(0U << 0)
+#define AP1302_SFX_MODE_SFX_BW_IDX				(1U << 0)
+#define AP1302_SFX_MODE_SFX_GRAYSCALE_IDX		(2U << 0)
+#define AP1302_SFX_MODE_SFX_NEGATIVE_IDX		(3U << 0)
+#define AP1302_SFX_MODE_SFX_SKETCH_IDX			(4U << 0)
+#define AP1302_AE_CTRL_MODE						(0x5002)
+#define AP1302_AE_CTRL_MODE_MASK				(0x00FF)
+#define AP1302_AE_CTRL_MANUAL_EXP_TIME_GAIN		(0U << 0)
+#define AP1302_AE_CTRL_FULL_AUTO				(12U << 0)
+#define AP1302_AE_CTRL_MANUAL_EXP_TIME_GAIN_IDX	(0U << 0)
+#define AP1302_AE_CTRL_FULL_AUTO_IDX			(1U << 0)
+#define AP1302_DZ_CT_X							(0x118C)
+#define AP1302_DZ_CT_X_MASK						(0xFFFF)
+#define AP1302_DZ_CT_Y							(0x118E)
+#define AP1302_DZ_CT_Y_MASK						(0xFFFF)
+#define AP1302_FLICK_CTRL                       (0x5440)
+#define AP1302_FLICK_CTRL_FREQ(n)				((n) << 8)
+#define AP1302_FLICK_CTRL_ETC_IHDR_UP			BIT(6)
+#define AP1302_FLICK_CTRL_ETC_DIS				BIT(5)
+#define AP1302_FLICK_CTRL_FRC_OVERRIDE_MAX_ET	BIT(4)
+#define AP1302_FLICK_CTRL_FRC_OVERRIDE_UPPER_ET	BIT(3)
+#define AP1302_FLICK_CTRL_FRC_EN				BIT(2)
+#define AP1302_FLICK_CTRL_MODE_MASK				(0x03)
+#define AP1302_FLICK_CTRL_ETC_IHDR_UP			BIT(6)
+#define AP1302_FLICK_CTRL_ETC_DIS				BIT(5)
+#define AP1302_FLICK_CTRL_FRC_OVERRIDE_MAX_ET	BIT(4)
+#define AP1302_FLICK_CTRL_FRC_OVERRIDE_UPPER_ET	BIT(3)
+#define AP1302_FLICK_CTRL_FRC_EN				BIT(2)
+#define AP1302_FLICK_CTRL_MODE_DISABLED         (0U << 0)
+#define AP1302_FLICK_CTRL_MODE_MANUAL           (1U << 0)
+#define AP1302_FLICK_CTRL_MODE_AUTO             (2U << 0)
+#define AP1302_FLICK_CTRL_FREQ_MASK			    (0xFF00)
+#define AP1302_FLICK_CTRL_MODE_50HZ             (AP1302_FLICK_CTRL_FREQ(50) | AP1302_FLICK_CTRL_MODE_MANUAL)
+#define AP1302_FLICK_CTRL_MODE_60HZ             (AP1302_FLICK_CTRL_FREQ(60) | AP1302_FLICK_CTRL_MODE_MANUAL)
+#define AP1302_FLICK_MODE_DISABLED_IDX			(0U << 0)
+#define AP1302_FLICK_MODE_ENABLED_IDX			(3U << 0)
+
+#define V4L2_CID_SENSOR_FLASH_ID            (V4L2_CID_USER_BASE + 44)
+
 static const struct of_device_id __of_match[] = {
 	{ .compatible = "tn,tevi-ar0144", },
 	{ },
@@ -30,9 +105,6 @@ static const struct camera_common_frmfmt sensor_frmfmt[] = {
 	{{1280, 720}, &__30fps, 2, 0, 0 /* number depend on dts mode list */},
 };
 
-static const u32 ctrl_cid_list[] = {
-};
-
 struct sensor_obj {
 	struct v4l2_subdev		*subdev;
 	struct camera_common_data	*s_data;
@@ -43,6 +115,9 @@ struct sensor_obj {
 	u32             vc_id;
 	u32             gpio_addr;
 	u32             ser_alias_id;
+	u8              flash_id;
+
+	struct mutex lock; /* Protects formats */
 };
 
 static int ar0144_i2c_read_8b(struct i2c_client *client, u8 reg, u8 *val, u8 size)
@@ -248,10 +323,29 @@ static const struct regmap_config sensor_regmap_config = {
 #endif
 };
 
-// static struct tegracam_ctrl_ops sensor_ctrl_ops = {
+// static const u32 ctrl_cid_list[] = {
+// 	TEGRA_CAMERA_CID_SENSOR_MODE_ID,
+// };
+
+// static int sensor_set_group_hold(struct tegracam_device *tc_dev, bool val)
+// {
+// 	/* TEVI-AP1302 does not support group hold */
+// 	return 0;
+// }
+
+// static struct tegracam_ctrl_ops sensor_nv_ctrl_ops = {
 // 	.numctrls = ARRAY_SIZE(ctrl_cid_list),
 // 	.ctrl_cid_list = ctrl_cid_list,
+// 	.set_group_hold = sensor_set_group_hold,
 // };
+
+struct sensor_obj* _to_sensor_priv(struct v4l2_ctrl *ctrl)
+{
+	struct tegracam_ctrl_handler *ctrl_hdl = 
+			container_of(ctrl->handler, struct tegracam_ctrl_handler, ctrl_handler);
+
+	return (struct sensor_obj*)ctrl_hdl->tc_dev->priv;
+}
 
 static int set_standby_mode_rel419(struct i2c_client *client, int enable)
 {
@@ -647,6 +741,7 @@ static struct camera_common_pdata *sensor_parse_dt(
 	u32 gpio_addr = 0x25;
 	u8 dser_i2c_val = 0x7F;
 	u32 dser_time = 0;
+	u32 alias_local_addr;
 
 	if (!np)
 		return NULL;
@@ -689,6 +784,17 @@ static struct camera_common_pdata *sensor_parse_dt(
 	}
 	dev_info(dev, "Read ser_alias_id %d\n", ser_alias_id);
 	priv->ser_alias_id = ser_alias_id;
+
+	err = of_property_read_u32_index(dser_node,
+						 "i2c_addr_alias_map_local",
+						 1,
+						 &alias_local_addr);
+	if (err) {
+		dev_err(dev, "invalid ser_alias_id on %pOF\n", dser_node);
+		goto error;
+	}
+	dev_info(dev, "Read alias_local_addr %x\n", alias_local_addr);
+	priv->flash_id = alias_local_addr;
 
 	err = of_property_read_u32(dser_node, "port", &port_idx);
 	if (err) {
@@ -899,6 +1005,910 @@ static int sensor_load_bootdata(struct sensor_obj *priv)
 	return 0;
 }
 
+/* -----------------------------------------------------------------------------
+ * V4L2 Controls
+ */
+
+static int sensor_set_brightness(struct sensor_obj *priv, s32 value)
+{
+	// Format is u3.12
+	return __i2c_write_16b(priv->tc_dev->client, AP1302_BRIGHTNESS, value & AP1302_BRIGHTNESS_MASK);
+}
+
+static int sensor_get_brightness(struct sensor_obj *priv, s32 *value)
+{
+	u16 val;
+	int ret;
+	ret = ar0144_i2c_read_16b(priv->tc_dev->client, AP1302_BRIGHTNESS, &val);
+	if (ret)
+		return ret;
+
+	*value = val & AP1302_BRIGHTNESS_MASK;
+	return 0;
+}
+
+static int sensor_set_contrast(struct sensor_obj *priv, s32 value)
+{
+	// Format is u3.12
+	return __i2c_write_16b(priv->tc_dev->client, AP1302_CONTRAST, value & AP1302_CONTRAST_MASK);
+}
+
+static int sensor_get_contrast(struct sensor_obj *priv, s32 *value)
+{
+	u16 val;
+	int ret;
+	ret = ar0144_i2c_read_16b(priv->tc_dev->client, AP1302_CONTRAST, &val);
+	if (ret)
+		return ret;
+
+	*value = val & AP1302_CONTRAST_MASK;
+	return 0;
+}
+
+static int sensor_set_saturation(struct sensor_obj *priv, s32 value)
+{
+	// Format is u3.12
+	return __i2c_write_16b(priv->tc_dev->client, AP1302_SATURATION, value & AP1302_SATURATION_MASK);
+}
+
+static int sensor_get_saturation(struct sensor_obj *priv, s32 *value)
+{
+	u16 val;
+	int ret;
+	ret = ar0144_i2c_read_16b(priv->tc_dev->client, AP1302_SATURATION, &val);
+	if (ret)
+		return ret;
+
+	*value = val & AP1302_SATURATION_MASK;
+	return 0;
+}
+
+static const char * const awb_mode_strings[] = {
+	"Manual Temp Mode", // AP1302_AWB_CTRL_MODE_MANUAL_TEMP
+	"Auto Mode", // AP1302_AWB_CTRL_MODE_AUTO
+	NULL,
+};
+
+static int sensor_set_awb_mode(struct sensor_obj *priv, s32 mode)
+{
+	u16 val = mode & AP1302_AWB_CTRL_MODE_MASK;
+
+	switch(val)
+	{
+	case 0:
+		val = AP1302_AWB_CTRL_MODE_MANUAL_TEMP;
+		break;
+	case 1:
+		val = AP1302_AWB_CTRL_MODE_AUTO;
+		break;
+	default:
+		val = AP1302_AWB_CTRL_MODE_AUTO;
+		break;
+	}
+
+	return __i2c_write_16b(priv->tc_dev->client, AP1302_AWB_CTRL_MODE, val);
+}
+
+static int sensor_get_awb_mode(struct sensor_obj *priv, s32 *mode)
+{
+	u16 val;
+	int ret;
+
+	ret = ar0144_i2c_read_16b(priv->tc_dev->client, AP1302_AWB_CTRL_MODE, &val);
+	if (ret)
+		return ret;
+
+	switch (val & AP1302_AWB_CTRL_MODE_MASK)
+	{
+	case AP1302_AWB_CTRL_MODE_MANUAL_TEMP:
+		*mode = 0;
+		break;
+	case AP1302_AWB_CTRL_MODE_AUTO:
+		*mode = 1;
+		break;
+	default:
+		*mode = 1;
+		break;
+	}
+
+	return 0;
+}
+
+static int sensor_set_gamma(struct sensor_obj *priv, s32 value)
+{
+	// Format is u3.12
+	return __i2c_write_16b(priv->tc_dev->client, AP1302_GAMMA, value & AP1302_GAMMA_MASK);
+}
+
+static int sensor_get_gamma(struct sensor_obj *priv, s32 *value)
+{
+	u16 val;
+	int ret;
+	ret = ar0144_i2c_read_16b(priv->tc_dev->client, AP1302_GAMMA, &val);
+	if (ret)
+		return ret;
+
+	*value = val & AP1302_GAMMA_MASK;
+	return 0;
+}
+
+static int sensor_set_exposure(struct sensor_obj *priv, s32 value)
+{
+	int ret;
+
+	ret = __i2c_write_16b(priv->tc_dev->client, AP1302_AE_MANUAL_EXP_TIME, (value >> 16) & 0xFFFF);
+	if (ret)
+		return ret;
+	usleep_range(9000, 10000);
+	ret = __i2c_write_16b(priv->tc_dev->client, AP1302_AE_MANUAL_EXP_TIME + 2, value & 0xFFFF);
+	if (ret)
+		return ret;
+
+	return 0;
+}
+
+static int sensor_get_exposure(struct sensor_obj *priv, s32 *value)
+{
+	u16 val_msb, val_lsb;
+	int ret;
+
+	ret = ar0144_i2c_read_16b(priv->tc_dev->client, AP1302_AE_MANUAL_EXP_TIME, &val_msb);
+	if (ret)
+		return ret;
+	usleep_range(9000, 10000);
+	ret = ar0144_i2c_read_16b(priv->tc_dev->client, AP1302_AE_MANUAL_EXP_TIME + 2, &val_lsb);
+	if (ret)
+		return ret;
+
+	*value = ((u32)(val_msb) << 16) + val_lsb;
+	return 0;
+}
+
+static int sensor_set_gain(struct sensor_obj *priv, s32 value)
+{
+	// Format is u8
+	return __i2c_write_16b(priv->tc_dev->client, AP1302_AE_MANUAL_GAIN, value & AP1302_AE_MANUAL_GAIN_MASK);
+}
+
+static int sensor_get_gain(struct sensor_obj *priv, s32 *value)
+{
+	u16 val;
+	int ret;
+	ret = ar0144_i2c_read_16b(priv->tc_dev->client, AP1302_AE_MANUAL_GAIN, &val);
+	if (ret)
+		return ret;
+
+	*value = val & AP1302_AE_MANUAL_GAIN_MASK;
+	return 0;
+}
+
+static int sensor_set_hflip(struct sensor_obj *priv, s32 flip)
+{
+	u16 val;
+	int ret;
+
+	ret = ar0144_i2c_read_16b(priv->tc_dev->client, AP1302_ORIENTATION, &val);
+	if (ret)
+		return ret;
+
+	val &= ~AP1302_ORIENTATION_HFLIP;
+	val |= flip ? AP1302_ORIENTATION_HFLIP : 0;
+
+	return __i2c_write_16b(priv->tc_dev->client, AP1302_ORIENTATION, val);
+}
+
+static int sensor_get_hflip(struct sensor_obj *priv, s32 *flip)
+{
+	u16 val;
+	int ret;
+
+	ret = ar0144_i2c_read_16b(priv->tc_dev->client, AP1302_ORIENTATION, &val);
+	if (ret)
+		return ret;
+
+	*flip = !!(val & AP1302_ORIENTATION_HFLIP);
+	return 0;
+}
+
+static int sensor_set_vflip(struct sensor_obj *priv, s32 flip)
+{
+	u16 val;
+	int ret;
+
+	ret = ar0144_i2c_read_16b(priv->tc_dev->client, AP1302_ORIENTATION, &val);
+	if (ret)
+		return ret;
+
+	val &= ~AP1302_ORIENTATION_VFLIP;
+	val |= flip ? AP1302_ORIENTATION_VFLIP : 0;
+
+	return __i2c_write_16b(priv->tc_dev->client, AP1302_ORIENTATION, val);
+}
+
+static int sensor_get_vflip(struct sensor_obj *priv, s32 *flip)
+{
+	u16 val;
+	int ret;
+
+	ret = ar0144_i2c_read_16b(priv->tc_dev->client, AP1302_ORIENTATION, &val);
+	if (ret)
+		return ret;
+
+	*flip = !!(val & AP1302_ORIENTATION_VFLIP);
+	return 0;
+}
+
+static int sensor_set_awb_temp(struct sensor_obj *priv, s32 value)
+{
+	return __i2c_write_16b(priv->tc_dev->client, AP1302_AWB_MANUAL_TEMP, value & AP1302_AWB_MANUAL_TEMP_MASK);
+}
+
+static int sensor_get_awb_temp(struct sensor_obj *priv, s32 *value)
+{
+	u16 val;
+	int ret;
+	ret = ar0144_i2c_read_16b(priv->tc_dev->client, AP1302_AWB_MANUAL_TEMP, &val);
+	if (ret)
+		return ret;
+
+	*value = val & AP1302_AWB_MANUAL_TEMP_MASK;
+	return 0;
+}
+
+static int sensor_set_sharpen(struct sensor_obj *priv, s32 value)
+{
+	// Format is u3.12
+	return __i2c_write_16b(priv->tc_dev->client, AP1302_SHARPEN, value & AP1302_SHARPEN_MASK);
+}
+
+static int sensor_get_sharpen(struct sensor_obj *priv, s32 *value)
+{
+	u16 val;
+	int ret;
+	ret = ar0144_i2c_read_16b(priv->tc_dev->client, AP1302_SHARPEN, &val);
+	if (ret)
+		return ret;
+
+	*value = val & AP1302_SHARPEN_MASK;
+	return 0;
+}
+
+static int sensor_set_backlight_compensation(struct sensor_obj *priv, s32 value)
+{
+	// Format is u3.12
+	return __i2c_write_16b(priv->tc_dev->client, AP1302_BACKLIGHT_COMPENSATION, value & AP1302_BACKLIGHT_COMPENSATION_MASK);
+}
+
+static int sensor_get_backlight_compensation(struct sensor_obj *priv, s32 *value)
+{
+	u16 val;
+	int ret;
+	ret = ar0144_i2c_read_16b(priv->tc_dev->client, AP1302_BACKLIGHT_COMPENSATION, &val);
+	if (ret)
+		return ret;
+
+	*value = val & AP1302_BACKLIGHT_COMPENSATION_MASK;
+	return 0;
+}
+
+static int sensor_set_zoom_target(struct sensor_obj *priv, s32 value)
+{
+	// Format u7.8
+	return __i2c_write_16b(priv->tc_dev->client, AP1302_DZ_TGT_FCT, value & AP1302_DZ_TGT_FCT_MASK);
+}
+
+static int sensor_get_zoom_target(struct sensor_obj *priv, s32 *value)
+{
+	u16 val;
+	int ret;
+	ret = ar0144_i2c_read_16b(priv->tc_dev->client, AP1302_DZ_TGT_FCT, &val);
+	if (ret)
+		return ret;
+
+	*value = val & AP1302_DZ_TGT_FCT_MASK;
+	return 0;
+}
+
+static const char * const sfx_mode_strings[] = {
+	"Normal Mode", // AP1302_SFX_MODE_SFX_NORMAL
+	"Black and White Mode", // AP1302_SFX_MODE_SFX_BW
+	"Grayscale Mode", // AP1302_SFX_MODE_SFX_GRAYSCALE
+	"Negative Mode", // AP1302_SFX_MODE_SFX_NEGATIVE
+	"Sketch Mode", // AP1302_SFX_MODE_SFX_SKETCH
+	NULL,
+};
+
+static int sensor_set_special_effect(struct sensor_obj *priv, s32 mode)
+{
+	u16 val = mode & AP1302_SFX_MODE_SFX_MASK;
+
+	switch(val)
+	{
+	case 0:
+		val = AP1302_SFX_MODE_SFX_NORMAL;
+		break;
+	case 1:
+		val = AP1302_SFX_MODE_SFX_BW;
+		break;
+	case 2:
+		val = AP1302_SFX_MODE_SFX_GRAYSCALE;
+		break;
+	case 3:
+		val = AP1302_SFX_MODE_SFX_NEGATIVE;
+		break;
+	case 4:
+		val = AP1302_SFX_MODE_SFX_SKETCH;
+		break;
+	default:
+		val = AP1302_SFX_MODE_SFX_NORMAL;
+		break;
+	}
+
+	return __i2c_write_16b(priv->tc_dev->client, AP1302_SFX_MODE, val);
+}
+
+static int sensor_get_special_effect(struct sensor_obj *priv, s32 *mode)
+{
+	u16 val;
+	int ret;
+
+	ret = ar0144_i2c_read_16b(priv->tc_dev->client, AP1302_SFX_MODE, &val);
+	if (ret)
+		return ret;
+
+	switch (val & AP1302_SFX_MODE_SFX_MASK)
+	{
+	case AP1302_SFX_MODE_SFX_NORMAL:
+		*mode = 0;
+		break;
+	case AP1302_SFX_MODE_SFX_BW:
+		*mode = 1;
+		break;
+	case AP1302_SFX_MODE_SFX_GRAYSCALE:
+		*mode = 2;
+		break;
+	case AP1302_SFX_MODE_SFX_NEGATIVE:
+		*mode = 3;
+		break;
+	case AP1302_SFX_MODE_SFX_SKETCH:
+		*mode = 4;
+		break;
+	default:
+		*mode = 0;
+		break;
+	}
+
+	return 0;
+}
+
+static const char * const ae_mode_strings[] = {
+	"Manual Mode", // AP1302_AE_CTRL_MANUAL_EXP_TIME_GAIN
+	"Auto Mode", // AP1302_AE_CTRL_FULL_AUTO
+	NULL,
+};
+
+static int sensor_set_ae_mode(struct sensor_obj *priv, s32 mode)
+{
+	u16 val = mode & AP1302_AE_CTRL_MODE_MASK;
+
+	switch(val)
+	{
+	case 0:
+		val |= AP1302_AE_CTRL_MANUAL_EXP_TIME_GAIN;
+		break;
+	case 1:
+		val |= AP1302_AE_CTRL_FULL_AUTO;
+		break;
+	default:
+		val |= AP1302_AE_CTRL_FULL_AUTO;
+		break;
+	}
+
+	return __i2c_write_16b(priv->tc_dev->client, AP1302_AE_CTRL_MODE, val);
+}
+
+static int sensor_get_ae_mode(struct sensor_obj *priv, s32 *mode)
+{
+	u16 val;
+	int ret;
+
+	ret = ar0144_i2c_read_16b(priv->tc_dev->client, AP1302_AE_CTRL_MODE, &val);
+	if (ret)
+		return ret;
+
+	switch (val & AP1302_AE_CTRL_MODE_MASK)
+	{
+	case AP1302_AE_CTRL_MANUAL_EXP_TIME_GAIN:
+		*mode = 0;
+		break;
+	case AP1302_AE_CTRL_FULL_AUTO:
+		*mode = 1;
+		break;
+	default:
+		*mode = 1;
+		break;
+	}
+	return 0;
+}
+
+static const char * const flick_mode_strings[] = {
+	"Disabled", 
+	"50 Hz",
+	"60 Hz",
+	"Auto",
+	NULL,
+};
+
+static int sensor_set_flick_mode(struct sensor_obj *priv, s32 mode)
+{
+	u16 val = 0;
+	switch(mode)
+	{
+	case 0:
+		val = AP1302_FLICK_CTRL_MODE_DISABLED;
+		break;
+	case 1:
+		val = AP1302_FLICK_CTRL_MODE_50HZ;
+		break;
+	case 2:
+		val = AP1302_FLICK_CTRL_MODE_60HZ;
+		break;
+	case 3:
+		val = AP1302_FLICK_CTRL_MODE_AUTO | 
+				AP1302_FLICK_CTRL_FRC_OVERRIDE_UPPER_ET | 
+				AP1302_FLICK_CTRL_FRC_EN;
+		break;
+	default:
+		val = AP1302_FLICK_CTRL_MODE_DISABLED;
+		break;
+	}
+
+	return __i2c_write_16b(priv->tc_dev->client, AP1302_FLICK_CTRL, val);
+}
+
+static int sensor_get_flick_mode(struct sensor_obj *priv, s32 *mode)
+{
+	u16 val;
+	int ret;
+
+	ret = ar0144_i2c_read_16b(priv->tc_dev->client, AP1302_FLICK_CTRL, &val);
+	if (ret)
+		return ret;
+
+	switch (val & AP1302_FLICK_CTRL_MODE_MASK)
+	{
+	case AP1302_FLICK_CTRL_MODE_DISABLED:
+		*mode = 0;
+		break;
+	case AP1302_FLICK_CTRL_MODE_MANUAL:
+		if((val & AP1302_FLICK_CTRL_FREQ_MASK) == AP1302_FLICK_CTRL_FREQ(50))
+			*mode = 1;
+		else if((val & AP1302_FLICK_CTRL_FREQ_MASK)  == AP1302_FLICK_CTRL_FREQ(50))
+			*mode = 2;
+		break;
+	case AP1302_FLICK_CTRL_MODE_AUTO:
+		*mode = 3;
+		break;
+	default:
+		*mode = 0;
+		break;
+	}
+	return 0;
+}
+
+static int sensor_set_pan_target(struct sensor_obj *priv, s32 value)
+{
+	// Format u7.8
+	return __i2c_write_16b(priv->tc_dev->client, AP1302_DZ_CT_X, value & AP1302_DZ_CT_X_MASK);
+}
+
+static int sensor_get_pan_target(struct sensor_obj *priv, s32 *value)
+{
+	u16 val;
+	int ret;
+	ret = ar0144_i2c_read_16b(priv->tc_dev->client, AP1302_DZ_CT_X, &val);
+	if (ret)
+		return ret;
+
+	*value = val & AP1302_DZ_CT_X_MASK;
+	return 0;
+}
+
+static int sensor_set_tilt_target(struct sensor_obj *priv, s32 value)
+{
+	// Format u7.8
+	return __i2c_write_16b(priv->tc_dev->client, AP1302_DZ_CT_Y, value & AP1302_DZ_CT_Y_MASK);
+}
+
+static int sensor_get_tilt_target(struct sensor_obj *priv, s32 *value)
+{
+	u16 val;
+	int ret;
+	ret = ar0144_i2c_read_16b(priv->tc_dev->client, AP1302_DZ_CT_Y, &val);
+	if (ret)
+		return ret;
+
+	*value = val & AP1302_DZ_CT_Y_MASK;
+	return 0;
+}
+
+static int sensor_s_ctrl(struct v4l2_ctrl *ctrl)
+{
+	struct sensor_obj *priv = _to_sensor_priv(ctrl);
+
+	switch (ctrl->id) {
+	case V4L2_CID_BRIGHTNESS:
+		return sensor_set_brightness(priv, ctrl->val);
+
+	case V4L2_CID_CONTRAST:
+		return sensor_set_contrast(priv, ctrl->val);
+
+	case V4L2_CID_SATURATION:
+		return sensor_set_saturation(priv, ctrl->val);
+
+	case V4L2_CID_AUTO_WHITE_BALANCE:
+		return sensor_set_awb_mode(priv, ctrl->val);
+
+	case V4L2_CID_GAMMA:
+		return sensor_set_gamma(priv, ctrl->val);
+
+	case V4L2_CID_EXPOSURE:
+		return sensor_set_exposure(priv, ctrl->val);
+
+	case V4L2_CID_GAIN:
+		return sensor_set_gain(priv, ctrl->val);
+
+	case V4L2_CID_HFLIP:
+		return sensor_set_hflip(priv, ctrl->val);
+
+	case V4L2_CID_VFLIP:
+		return sensor_set_vflip(priv, ctrl->val);
+
+	case V4L2_CID_POWER_LINE_FREQUENCY:
+		return sensor_set_flick_mode(priv, ctrl->val);
+
+	case V4L2_CID_WHITE_BALANCE_TEMPERATURE:
+		return sensor_set_awb_temp(priv, ctrl->val);
+
+	case V4L2_CID_SHARPNESS:
+		return sensor_set_sharpen(priv, ctrl->val);
+
+	case V4L2_CID_BACKLIGHT_COMPENSATION:
+		return sensor_set_backlight_compensation(priv, ctrl->val);
+
+	case V4L2_CID_COLORFX:
+		return sensor_set_special_effect(priv, ctrl->val);
+
+	case V4L2_CID_EXPOSURE_AUTO:
+		return sensor_set_ae_mode(priv, ctrl->val);
+
+	case V4L2_CID_PAN_ABSOLUTE:
+		return sensor_set_pan_target(priv, ctrl->val);
+
+	case V4L2_CID_TILT_ABSOLUTE:
+		return sensor_set_tilt_target(priv, ctrl->val);
+
+	case V4L2_CID_ZOOM_ABSOLUTE:
+		return sensor_set_zoom_target(priv, ctrl->val);
+
+	case V4L2_CID_SENSOR_FLASH_ID:
+		return 0;
+
+	default:
+		dev_dbg(priv->tc_dev->dev, "Unknown control 0x%x\n",
+			ctrl->id);
+		return -EINVAL;
+	}
+}
+
+static int sensor_g_ctrl(struct v4l2_ctrl *ctrl)
+{
+	struct sensor_obj *priv = _to_sensor_priv(ctrl);
+
+	switch (ctrl->id) {
+	case V4L2_CID_BRIGHTNESS:
+		return sensor_get_brightness(priv, &ctrl->val);
+
+	case V4L2_CID_CONTRAST:
+		return sensor_get_contrast(priv, &ctrl->val);
+
+	case V4L2_CID_SATURATION:
+		return sensor_get_saturation(priv, &ctrl->val);
+
+	case V4L2_CID_AUTO_WHITE_BALANCE:
+		return sensor_get_awb_mode(priv, &ctrl->val);
+
+	case V4L2_CID_GAMMA:
+		return sensor_get_gamma(priv, &ctrl->val);
+
+	case V4L2_CID_EXPOSURE:
+		return sensor_get_exposure(priv, &ctrl->val);
+
+	case V4L2_CID_GAIN:
+		return sensor_get_gain(priv, &ctrl->val);
+
+	case V4L2_CID_HFLIP:
+		return sensor_get_hflip(priv, &ctrl->val);
+
+	case V4L2_CID_VFLIP:
+		return sensor_get_vflip(priv, &ctrl->val);
+
+	case V4L2_CID_POWER_LINE_FREQUENCY:
+		return sensor_get_flick_mode(priv, &ctrl->val);
+
+	case V4L2_CID_WHITE_BALANCE_TEMPERATURE:
+		return sensor_get_awb_temp(priv, &ctrl->val);
+
+	case V4L2_CID_SHARPNESS:
+		return sensor_get_sharpen(priv, &ctrl->val);
+
+	case V4L2_CID_BACKLIGHT_COMPENSATION:
+		return sensor_get_backlight_compensation(priv, &ctrl->val);
+
+	case V4L2_CID_COLORFX:
+		return sensor_get_special_effect(priv, &ctrl->val);
+
+	case V4L2_CID_EXPOSURE_AUTO:
+		return sensor_get_ae_mode(priv, &ctrl->val);
+
+	case V4L2_CID_PAN_ABSOLUTE:
+		return sensor_get_pan_target(priv, &ctrl->val);
+
+	case V4L2_CID_TILT_ABSOLUTE:
+		return sensor_get_tilt_target(priv, &ctrl->val);
+
+	case V4L2_CID_ZOOM_ABSOLUTE:
+		return sensor_get_zoom_target(priv, &ctrl->val);
+
+	case V4L2_CID_SENSOR_FLASH_ID:
+		ctrl->val = priv->flash_id;
+		return 0;
+
+	default:
+		dev_dbg(priv->tc_dev->dev, "Unknown control 0x%x\n",
+			ctrl->id);
+		return -EINVAL;
+	}
+}
+
+static const struct v4l2_ctrl_ops sensor_ctrl_ops = {
+	.s_ctrl = sensor_s_ctrl,
+};
+
+static const struct v4l2_ctrl_config sensor_ctrls[] = {
+	{
+		.ops = &sensor_ctrl_ops,
+		.id = V4L2_CID_BRIGHTNESS,
+		.name = "Brightness",
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.min = 0x0,
+		.max = 0xFFFF,
+		.step = 0x1,
+		.def = 0x0,
+	},
+	{
+		.ops = &sensor_ctrl_ops,
+		.id = V4L2_CID_CONTRAST,
+		.name = "Contrast",
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.min = 0x0,
+		.max = 0xFFFF,
+		.step = 0x1,
+		.def = 0x0,
+	},
+	{
+		.ops = &sensor_ctrl_ops,
+		.id = V4L2_CID_SATURATION,
+		.name = "Saturation",
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.min = 0x0,
+		.max = 0xFFFF,
+		.step = 0x1,
+		.def = 0x0,
+	},
+	{
+		.ops = &sensor_ctrl_ops,
+		.id = V4L2_CID_AUTO_WHITE_BALANCE,
+		.name = "White_Balance_Mode",
+		.type = V4L2_CTRL_TYPE_MENU,
+		.max = AP1302_AWB_CTRL_MODE_AUTO_IDX,
+		.def = AP1302_AWB_CTRL_MODE_AUTO_IDX,
+		.qmenu = awb_mode_strings,
+	},
+	{
+		.ops = &sensor_ctrl_ops,
+		.id = V4L2_CID_GAMMA,
+		.name = "Gamma",
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.min = 0x0,
+		.max = 0xFFFF,
+		.step = 0x1,
+		.def = 0x2333, // 2.2
+	},
+	{
+		.ops = &sensor_ctrl_ops,
+		.id = V4L2_CID_EXPOSURE,
+		.name = "Exposure",
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.min = 0x0,
+		.max = 0xF4240,
+		.step = 1,
+		.def = 0x8235, // 33333 us
+	},
+	{
+		.ops = &sensor_ctrl_ops,
+		.id = V4L2_CID_GAIN,
+		.name = "Gain",
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.min = 0x1,
+		.max = 0x40,
+		.step = 0x1,
+		.def = 0x1,
+	},
+	{
+		.ops = &sensor_ctrl_ops,
+		.id = V4L2_CID_HFLIP,
+		.name = "HFlip",
+		.type = V4L2_CTRL_TYPE_BOOLEAN,
+		.min = 0,
+		.max = 1,
+		.step = 1,
+		.def = 0,
+	},
+	{
+		.ops = &sensor_ctrl_ops,
+		.id = V4L2_CID_VFLIP,
+		.name = "VFlip",
+		.type = V4L2_CTRL_TYPE_BOOLEAN,
+		.min = 0,
+		.max = 1,
+		.step = 1,
+		.def = 0,
+	},
+	{
+		.ops = &sensor_ctrl_ops,
+		.id = V4L2_CID_POWER_LINE_FREQUENCY,
+		.name = "Power_Line_Frequency",
+		.type = V4L2_CTRL_TYPE_MENU,
+		.max = AP1302_FLICK_MODE_ENABLED_IDX,
+		.def = AP1302_FLICK_MODE_DISABLED_IDX,
+		.qmenu = flick_mode_strings,
+	},
+	{
+		.ops = &sensor_ctrl_ops,
+		.id = V4L2_CID_WHITE_BALANCE_TEMPERATURE,
+		.name = "White_Balance_Temperature",
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.min = 0x8FC,
+		.max = 0x3A98,
+		.step = 0x1,
+		.def = 0x1388,
+	},
+	{
+		.ops = &sensor_ctrl_ops,
+		.id = V4L2_CID_SHARPNESS,
+		.name = "Sharpness",
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.min = 0x0,
+		.max = 0xFFFF,
+		.step = 0x1,
+		.def = 0x0,
+	},
+	{
+		.ops = &sensor_ctrl_ops,
+		.id = V4L2_CID_BACKLIGHT_COMPENSATION,
+		.name = "Backlight_Compensation",
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.min = 0x0,
+		.max = 0xFFFF,
+		.step = 0x1,
+		.def = 0x0,
+	},
+	{
+		.ops = &sensor_ctrl_ops,
+		.id = V4L2_CID_COLORFX,
+		.name = "Special_Effect",
+		.type = V4L2_CTRL_TYPE_MENU,
+		.max = AP1302_SFX_MODE_SFX_SKETCH_IDX,
+		.def = AP1302_SFX_MODE_SFX_NORMAL_IDX,
+		.qmenu = sfx_mode_strings,
+	},
+	{
+		.ops = &sensor_ctrl_ops,
+		.id = V4L2_CID_EXPOSURE_AUTO,
+		.name = "Exposure_Mode",
+		.type = V4L2_CTRL_TYPE_MENU,
+		.max = AP1302_AE_CTRL_FULL_AUTO_IDX,
+		.def = AP1302_AE_CTRL_FULL_AUTO_IDX,
+		.qmenu = ae_mode_strings,
+	},
+	{
+		.ops = &sensor_ctrl_ops,
+		.id = V4L2_CID_PAN_ABSOLUTE,
+		.name = "Pan_Target",
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.min = 0x0,
+		.max = 0xFFFF,
+		.step = 0x1,
+		.def = 0x0,
+	},
+	{
+		.ops = &sensor_ctrl_ops,
+		.id = V4L2_CID_TILT_ABSOLUTE,
+		.name = "Tilt_Target",
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.min = 0x0,
+		.max = 0xFFFF,
+		.step = 0x1,
+		.def = 0x0,
+	},
+	{
+		.ops = &sensor_ctrl_ops,
+		.id = V4L2_CID_ZOOM_ABSOLUTE,
+		.name = "Zoom_Target",
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.min = 0x0,
+		.max = 0xFFFF,
+		.step = 0x1,
+		.def = 0x0,
+	},
+	{
+		.ops = &sensor_ctrl_ops,
+		.id = V4L2_CID_SENSOR_FLASH_ID,
+		.name = "Sensor_Flash_ID",
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.min = 0x0,
+		.max = 0x7F,
+		.step = 0x1,
+		.def = 0x54,
+	},
+};
+
+static int sensor_ctrls_init(struct sensor_obj *priv)
+{
+	struct tegracam_ctrl_handler *ctrl_hdl;
+	unsigned int i;
+	int ret;
+
+	ctrl_hdl = priv->s_data->tegracam_ctrl_hdl;
+
+	if(ctrl_hdl == NULL){
+		dev_info(&priv->tc_dev->client->dev,"init control handler...\n");
+		ret = v4l2_ctrl_handler_init(&ctrl_hdl->ctrl_handler, ARRAY_SIZE(sensor_ctrls));
+		if (ret) {
+			dev_err(&priv->tc_dev->client->dev,"init handler fail\n");
+			return ret;
+		}
+	}
+
+	for (i = 0; i < ARRAY_SIZE(sensor_ctrls); i++)
+	{
+		struct v4l2_ctrl * ctrl = v4l2_ctrl_new_custom(&ctrl_hdl->ctrl_handler,
+								&sensor_ctrls[i], NULL);
+		ret = sensor_g_ctrl(ctrl);
+		if (!ret && ctrl->default_value != ctrl->val) {
+			// Updating default value based on firmware values
+			dev_dbg(&priv->tc_dev->client->dev,"Ctrl '%s' default value updated from %lld to %d\n",
+					ctrl->name, ctrl->default_value, ctrl->val);
+			ctrl->default_value = ctrl->val;
+			ctrl->cur.val = ctrl->val;
+		}
+	}
+
+	if (ctrl_hdl->ctrl_handler.error) {
+		dev_err(&priv->tc_dev->client->dev, "ctrls error\n");
+		ret = ctrl_hdl->ctrl_handler.error;
+		v4l2_ctrl_handler_free(&ctrl_hdl->ctrl_handler);
+		return ret;
+	}
+
+	/* Use same lock for controls as for everything else. */
+	ctrl_hdl->ctrl_handler.lock = &priv->lock;
+	priv->subdev->ctrl_handler = &ctrl_hdl->ctrl_handler;
+
+	return 0;
+}
+
 static int sensor_board_setup(struct sensor_obj *priv)
 {
 	struct camera_common_data *s_data = priv->s_data;
@@ -1057,7 +2067,7 @@ static int __probe(struct i2c_client *client, const struct i2c_device_id *id)
 	tc_dev->dev_regmap_config = &sensor_regmap_config;
 	tc_dev->sensor_ops = &sensor_common_ops;
 	tc_dev->v4l2sd_internal_ops = &sensor_subdev_internal_ops;
-	// tc_dev->tcctrl_ops = &sensor_ctrl_ops;
+	// tc_dev->tcctrl_ops = &sensor_nv_ctrl_ops;
 
 	err = tegracam_device_register(tc_dev);
 	if (err) {
@@ -1082,7 +2092,16 @@ static int __probe(struct i2c_client *client, const struct i2c_device_id *id)
 		return err;
 	}
 
+	err = sensor_ctrls_init(priv);
+	if (err) {
+		dev_err(&client->dev, "failed to init controls: %d", err);
+		goto error_probe;
+	}
+
 	dev_info(dev, "detected tevi-ar0144 camera sensor\n");
+
+error_probe:
+	mutex_destroy(&priv->lock);
 
 	return 0;
 }
