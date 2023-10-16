@@ -65,7 +65,29 @@
 #define AP1302_DZ_CT_X_MASK						(0xFFFF)
 #define AP1302_DZ_CT_Y							(0x118E)
 #define AP1302_DZ_CT_Y_MASK						(0xFFFF)
+#define AP1302_FLICK_CTRL                       (0x5440)
+#define AP1302_FLICK_CTRL_FREQ(n)				((n) << 8)
+#define AP1302_FLICK_CTRL_ETC_IHDR_UP			BIT(6)
+#define AP1302_FLICK_CTRL_ETC_DIS				BIT(5)
+#define AP1302_FLICK_CTRL_FRC_OVERRIDE_MAX_ET	BIT(4)
+#define AP1302_FLICK_CTRL_FRC_OVERRIDE_UPPER_ET	BIT(3)
+#define AP1302_FLICK_CTRL_FRC_EN				BIT(2)
+#define AP1302_FLICK_CTRL_MODE_MASK				(0x03)
+#define AP1302_FLICK_CTRL_ETC_IHDR_UP			BIT(6)
+#define AP1302_FLICK_CTRL_ETC_DIS				BIT(5)
+#define AP1302_FLICK_CTRL_FRC_OVERRIDE_MAX_ET	BIT(4)
+#define AP1302_FLICK_CTRL_FRC_OVERRIDE_UPPER_ET	BIT(3)
+#define AP1302_FLICK_CTRL_FRC_EN				BIT(2)
+#define AP1302_FLICK_CTRL_MODE_DISABLED         (0U << 0)
+#define AP1302_FLICK_CTRL_MODE_MANUAL           (1U << 0)
+#define AP1302_FLICK_CTRL_MODE_AUTO             (2U << 0)
+#define AP1302_FLICK_CTRL_FREQ_MASK			    (0xFF00)
+#define AP1302_FLICK_CTRL_MODE_50HZ             (AP1302_FLICK_CTRL_FREQ(50) | AP1302_FLICK_CTRL_MODE_MANUAL)
+#define AP1302_FLICK_CTRL_MODE_60HZ             (AP1302_FLICK_CTRL_FREQ(60) | AP1302_FLICK_CTRL_MODE_MANUAL)
+#define AP1302_FLICK_MODE_DISABLED_IDX			(0U << 0)
+#define AP1302_FLICK_MODE_ENABLED_IDX			(3U << 0)
 
+#define V4L2_CID_SENSOR_FLASH_ID            (V4L2_CID_USER_BASE + 44)
 static const struct of_device_id sensor_of_match[] = {
 	{ .compatible = "tn,tevi-ap1302", },
 	{ },
@@ -88,6 +110,7 @@ struct sensor_obj {
 	int info_gpio;
 	u8 selected_mode;
 	u8 selected_sensor;
+	u8 flash_id;
 	char *sensor_name;
 
 	struct mutex lock;	/* Protects formats */
@@ -97,8 +120,7 @@ struct sensor_obj* _to_sensor_obj_priv(struct v4l2_ctrl *ctrl)
 {
 	struct tegracam_ctrl_handler *ctrl_hdl = 
 			container_of(ctrl->handler, struct tegracam_ctrl_handler, ctrl_handler);
-	struct tegracam_device **tc_dev = &ctrl_hdl->tc_dev;
-	return container_of(tc_dev, struct sensor_obj, tc_dev);
+	return ctrl_hdl->tc_dev->priv;
 }
 
 static int sensor_i2c_read(struct i2c_client *client, u16 reg, u8 *val, u8 size)
@@ -193,7 +215,7 @@ static int sensor_i2c_write_bust(struct i2c_client *client, u8 *buf, size_t len)
 
 static const struct regmap_config sensor_regmap_config = {
 	.reg_bits = 16,
-	.val_bits = 8,
+	.val_bits = 16,
 	.cache_type = REGCACHE_RBTREE,
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0)
 	.use_single_rw = true,
@@ -647,6 +669,71 @@ static int ops_get_ae_mode(struct sensor_obj *priv, s32 *mode)
 	return 0;
 }
 
+static const char * const flick_mode_strings[] = {
+	"Disabled", 
+	"50 Hz",
+	"60 Hz",
+	"Auto",
+	NULL,
+};
+
+static int ops_set_flick_mode(struct sensor_obj *priv, s32 mode)
+{
+	u16 val = 0;
+	switch(mode)
+	{
+	case 0:
+		val = AP1302_FLICK_CTRL_MODE_DISABLED;
+		break;
+	case 1:
+		val = AP1302_FLICK_CTRL_MODE_50HZ;
+		break;
+	case 2:
+		val = AP1302_FLICK_CTRL_MODE_60HZ;
+		break;
+	case 3:
+		val = AP1302_FLICK_CTRL_MODE_AUTO | 
+				AP1302_FLICK_CTRL_FRC_OVERRIDE_UPPER_ET | 
+				AP1302_FLICK_CTRL_FRC_EN;
+		break;
+	default:
+		val = AP1302_FLICK_CTRL_MODE_DISABLED;
+		break;
+	}
+
+	return sensor_i2c_write_16b(priv->tc_dev->client, AP1302_FLICK_CTRL, val);
+}
+
+static int ops_get_flick_mode(struct sensor_obj *priv, s32 *mode)
+{
+	u16 val;
+	int ret;
+
+	ret = sensor_i2c_read_16b(priv->tc_dev->client, AP1302_FLICK_CTRL, &val);
+	if (ret)
+		return ret;
+
+	switch (val & AP1302_FLICK_CTRL_MODE_MASK)
+	{
+	case AP1302_FLICK_CTRL_MODE_DISABLED:
+		*mode = 0;
+		break;
+	case AP1302_FLICK_CTRL_MODE_MANUAL:
+		if((val & AP1302_FLICK_CTRL_FREQ_MASK) == AP1302_FLICK_CTRL_FREQ(50))
+			*mode = 1;
+		else if((val & AP1302_FLICK_CTRL_FREQ_MASK)  == AP1302_FLICK_CTRL_FREQ(50))
+			*mode = 2;
+		break;
+	case AP1302_FLICK_CTRL_MODE_AUTO:
+		*mode = 3;
+		break;
+	default:
+		*mode = 0;
+		break;
+	}
+	return 0;
+}
+
 static int ops_set_pan_target(struct sensor_obj *priv, s32 value)
 {
 	// Format u7.8
@@ -716,6 +803,9 @@ static int ops_s_ctrl(struct v4l2_ctrl *ctrl)
 	case V4L2_CID_VFLIP:
 		return ops_set_vflip(priv, ctrl->val);
 
+	case V4L2_CID_POWER_LINE_FREQUENCY:
+		return ops_set_flick_mode(priv, ctrl->val);
+
 	case V4L2_CID_WHITE_BALANCE_TEMPERATURE:
 		return ops_set_awb_temp(priv, ctrl->val);
 
@@ -739,6 +829,9 @@ static int ops_s_ctrl(struct v4l2_ctrl *ctrl)
 
 	case V4L2_CID_ZOOM_ABSOLUTE:
 		return ops_set_zoom_target(priv, ctrl->val);
+
+	case V4L2_CID_SENSOR_FLASH_ID:
+		return 0;
 
 	default:
 		dev_dbg(&priv->tc_dev->client->dev, "Unknown control 0x%x\n",ctrl->id);
@@ -779,6 +872,9 @@ static int ops_g_ctrl(struct v4l2_ctrl *ctrl)
 	case V4L2_CID_VFLIP:
 		return ops_get_vflip(priv, &ctrl->val);
 
+	case V4L2_CID_POWER_LINE_FREQUENCY:
+		return ops_get_flick_mode(priv, &ctrl->val);
+
 	case V4L2_CID_WHITE_BALANCE_TEMPERATURE:
 		return ops_get_awb_temp(priv, &ctrl->val);
 
@@ -802,6 +898,10 @@ static int ops_g_ctrl(struct v4l2_ctrl *ctrl)
 
 	case V4L2_CID_ZOOM_ABSOLUTE:
 		return ops_get_zoom_target(priv, &ctrl->val);
+
+	case V4L2_CID_SENSOR_FLASH_ID:
+		ctrl->val = priv->otp_flash_instance->flash_id;
+		return 0;
 
 	default:
 		dev_dbg(&priv->tc_dev->client->dev, "Unknown control 0x%x\n",ctrl->id);
@@ -905,6 +1005,15 @@ static const struct v4l2_ctrl_config ops_ctrls[] = {
 	},
 	{
 		.ops = &sensor_ctrl_ops,
+		.id = V4L2_CID_POWER_LINE_FREQUENCY,
+		.name = "Power_Line_Frequency",
+		.type = V4L2_CTRL_TYPE_MENU,
+		.max = AP1302_FLICK_MODE_ENABLED_IDX,
+		.def = AP1302_FLICK_MODE_DISABLED_IDX,
+		.qmenu = flick_mode_strings,
+	},
+	{
+		.ops = &sensor_ctrl_ops,
 		.id = V4L2_CID_WHITE_BALANCE_TEMPERATURE,
 		.name = "White_Balance_Temperature",
 		.type = V4L2_CTRL_TYPE_INTEGER,
@@ -980,6 +1089,16 @@ static const struct v4l2_ctrl_config ops_ctrls[] = {
 		.max = 0x800,
 		.step = 0x1,
 		.def = 0x100,
+	},
+	{
+		.ops = &sensor_ctrl_ops,
+		.id = V4L2_CID_SENSOR_FLASH_ID,
+		.name = "Sensor_Flash_ID",
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.min = 0x0,
+		.max = 0x7F,
+		.step = 0x1,
+		.def = 0x54,
 	},
 };
 
