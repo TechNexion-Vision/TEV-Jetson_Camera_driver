@@ -76,6 +76,9 @@
 #define HOST_COMMAND_ISP_CTRL_CT_MIN                            (0x3174)
 #define HOST_COMMAND_ISP_CTRL_SYSTEM_START                      (0x3176)
 #define HOST_COMMAND_ISP_CTRL_ISP_RESET                         (0x3178)
+#define HOST_COMMAND_ISP_CTRL_TRIGGER_MODE                      (0x317A)
+#define HOST_COMMAND_ISP_CTRL_FLICK_CTRL                        (0x317C)
+#define HOST_COMMAND_ISP_CTRL_MIPI_FREQ                         (0x317E)
 
 /* Define host command register of ISP bootdata page */
 #define HOST_COMMAND_ISP_BOOTDATA_1                             (0x4000)
@@ -275,6 +278,7 @@ struct tevs {
 
 	int data_lanes;
 	int continuous_clock;
+	int data_frequency;
 	u8 selected_mode;
 	u8 selected_sensor;
 	bool hw_reset_mode;
@@ -2099,6 +2103,16 @@ static int tevs_setup(struct tevs *tevs)
 		}
 	}
 
+	tevs->data_frequency = 800;
+	if (of_property_read_u32(tevs->dev->of_node, "data-frequency",
+				 &tevs->data_frequency) == 0) {
+		if ((tevs->data_frequency < 100) || (tevs->data_frequency > 1200)) {
+			dev_err(tevs->dev,
+				"value of 'data-frequency = <%d>' property is invaild\n", tevs->data_frequency);
+			return -EINVAL;
+		}
+	}
+
 	tevs->hw_reset_mode =
 		of_property_read_bool(tevs->dev->of_node, "hw-reset");
 
@@ -2113,6 +2127,15 @@ static int tevs_setup(struct tevs *tevs)
 
 	if (tevs_try_on(tevs) != 0) {
 		dev_err(tevs->dev, "cannot find tevs camera\n");
+		return -EINVAL;
+	}
+
+	ret = tevs_i2c_write_16b(tevs,
+				HOST_COMMAND_ISP_CTRL_MIPI_FREQ,
+				tevs->data_frequency);
+	usleep_range(90000, 100000);
+	if (ret < 0) {
+		dev_err(tevs->dev, "set mipi frequency failed\n");
 		return -EINVAL;
 	}
 
