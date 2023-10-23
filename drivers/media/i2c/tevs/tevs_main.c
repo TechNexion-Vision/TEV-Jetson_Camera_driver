@@ -502,13 +502,32 @@ static int tevs_standby(struct tevs *tevs, int enable)
 	return 0;
 }
 
-// static int tevs_power_on(struct tevs *tevs)
+static int tevs_check_boot_state(struct tevs *tevs)
+{
+	u16 boot_state;
+	u8 timeout = 0;
+	int ret = 0;
+
+	while (timeout < 20) {
+		tevs_i2c_read_16b(tevs,
+				HOST_COMMAND_TEVS_BOOT_STATE, &boot_state);
+		if (boot_state == 0x08)
+			break;
+		dev_dbg(tevs->dev, "tevs bootup state: %d\n", boot_state);
+		if (++timeout >= 20) {
+			dev_err(tevs->dev, "tevs bootup timeout: state: 0x%02X\n", boot_state);
+			ret = -EINVAL;
+		}
+		msleep(20);
+	}
+
+	return ret;
+}
+
 static int tevs_power_on(struct camera_common_data *s_data)
 {
 	struct tegracam_device *tc_dev = to_tegracam_device(s_data);
 	struct tevs *tevs = (struct tevs*)tc_dev->priv;
-	u8 isp_state;
-	u8 timeout = 0;
 	int ret = 0;
 
 	dev_dbg(tevs->dev, "%s()\n", __func__);
@@ -516,18 +535,9 @@ static int tevs_power_on(struct camera_common_data *s_data)
 	gpiod_set_value_cansleep(tevs->reset_gpio, 1);
 	msleep(100);
 
-	while (timeout < 20) {
-		tevs_i2c_read(tevs,
-				HOST_COMMAND_TEVS_BOOT_STATE, &isp_state, 1);
-		if (isp_state == 0x08)
-			break;
-		dev_dbg(tevs->dev, "isp bootup state: %d\n", isp_state);
-		if (++timeout >= 20) {
-			dev_err(tevs->dev, "isp bootup timeout: state: 0x%02X\n", isp_state);
-			ret = -EINVAL;
-		}
-		msleep(20);
-	}
+	ret = tevs_check_boot_state(tevs);
+	if(ret != 0)
+		return ret;
 
 	if((tevs->hw_reset_mode | tevs->trigger_mode)) {
 		ret = tevs_init_setting(tevs);
@@ -643,12 +653,12 @@ static struct camera_common_pdata *tevs_parse_dt(
 	return board_priv_pdata;
 }
 
-static int sensor_set_mode(struct tegracam_device *tc_dev)
+static int tevs_set_mode(struct tegracam_device *tc_dev)
 {
 	struct camera_common_data *s_data = tc_dev->s_data;
 	struct tevs *tevs = tc_dev->priv;
 	int i;
-	dev_info(tc_dev->dev,
+	dev_dbg(tc_dev->dev,
 		"%s() , {%d}, fmt_width=%d, fmt_height=%d\n",
 		__func__,
 		s_data->mode, 
@@ -676,7 +686,7 @@ static int tevs_start_streaming(struct tegracam_device *tc_dev)
 {
 	struct tevs *tevs = tc_dev->priv;
 	int ret = 0;
-	dev_info(tc_dev->dev, "%s()\n", __func__);
+	dev_dbg(tc_dev->dev, "%s()\n", __func__);
 
 	if (tevs->selected_mode >=
 	    tevs_sensor_table[tevs->selected_sensor].res_list_size)
@@ -767,7 +777,7 @@ static struct camera_common_sensor_ops tevs_common_ops = {
 	.parse_dt = tevs_parse_dt,
 	.power_get = tevs_power_get,
 	.power_put = tevs_power_put,
-	.set_mode = sensor_set_mode,
+	.set_mode = tevs_set_mode,
 	.start_streaming = tevs_start_streaming,
 	.stop_streaming = tevs_stop_streaming,
 };
@@ -2133,7 +2143,11 @@ static int tevs_setup(struct tevs *tevs)
 	ret = tevs_i2c_write_16b(tevs,
 				HOST_COMMAND_ISP_CTRL_MIPI_FREQ,
 				tevs->data_frequency);
-	usleep_range(90000, 100000);
+	msleep(50);
+	if (tevs_check_boot_state(tevs) != 0) {
+		dev_err(tevs->dev, "check tevs bootup status failed\n");
+		return -EINVAL;
+	}
 	if (ret < 0) {
 		dev_err(tevs->dev, "set mipi frequency failed\n");
 		return -EINVAL;
