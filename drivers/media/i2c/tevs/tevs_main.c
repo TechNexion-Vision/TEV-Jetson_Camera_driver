@@ -149,7 +149,7 @@
 #define HOST_COMMAND_ISP_CTRL_I2C_ADDR                          (0xF000)
 #define HOST_COMMAND_ISP_CTRL_I2C_DATA                          (0xF002)
 
-#define TEVS_TRIGGER_CTRL                   	(0x1186)
+#define TEVS_TRIGGER_CTRL                   	HOST_COMMAND_ISP_CTRL_TRIGGER_MODE
 
 #define TEVS_BRIGHTNESS 						HOST_COMMAND_ISP_CTRL_BRIGHTNESS
 #define TEVS_BRIGHTNESS_MAX 					HOST_COMMAND_ISP_CTRL_BRIGHTNESS_MAX
@@ -389,15 +389,26 @@ int tevs_i2c_write_16b(struct tevs *tevs, u16 reg, u16 val)
 
 int tevs_enable_trigger_mode(struct tevs *tevs, int enable)
 {
-	u8 trigger_data[4];
+	int ret = 0;
+	int count = 0;
+	u16 val, trigger_data;
 	dev_dbg(tevs->dev, "%s(): enable:%d\n", __func__, enable);
+	trigger_data = (0x300 | ( (enable > 0) ? 0x82 : 0x80));
 
-	trigger_data[0] = TEVS_TRIGGER_CTRL >> 8;
-	trigger_data[1] = TEVS_TRIGGER_CTRL & 0xff;
-	trigger_data[2] = 0x3;
-	trigger_data[3] = (enable > 0) ? 0x82 : 0x80;
+	if((ret = tevs_i2c_write_16b(tevs, TEVS_TRIGGER_CTRL, trigger_data)) < 0)
+		return ret;
 
-	return tevs_i2c_write(tevs, HOST_COMMAND_ISP_CTRL_I2C_ADDR, trigger_data, sizeof(trigger_data));
+	do {
+		if((ret = tevs_i2c_read_16b(tevs, TEVS_TRIGGER_CTRL, &val)) < 0)
+				return ret;
+		if((val & 0x300) == 0)
+			break;
+			
+	} while(count++ < 10);
+
+	usleep_range(90000, 100000);
+
+	return ret;
 }
 
 int tevs_load_header_info(struct tevs *tevs)
@@ -694,40 +705,40 @@ static int tevs_start_streaming(struct tegracam_device *tc_dev)
 
 	if(!(tevs->hw_reset_mode | tevs->trigger_mode))
 			ret = tevs_standby(tevs, 0);
-		if (ret == 0) {
-			int fps = *tevs_sensor_table[tevs->selected_sensor]
-					  .frmfmt[tevs->selected_mode]
-					  .framerates;
-			dev_dbg(tc_dev->dev, "%s() width=%d, height=%d\n",
-				__func__,
-				tevs_sensor_table[tevs->selected_sensor]
-					.frmfmt[tevs->selected_mode]
-					.size.width,
-				tevs_sensor_table[tevs->selected_sensor]
-					.frmfmt[tevs->selected_mode]
-					.size.height);
-			tevs_i2c_write_16b(
-				tevs,
-				HOST_COMMAND_ISP_CTRL_PREVIEW_SENSOR_MODE,
-				tevs_sensor_table[tevs->selected_sensor]
-					.frmfmt[tevs->selected_mode]
-					.mode);
-			tevs_i2c_write_16b(
-				tevs,
-				HOST_COMMAND_ISP_CTRL_PREVIEW_WIDTH,
-				tevs_sensor_table[tevs->selected_sensor]
-					.frmfmt[tevs->selected_mode]
-					.size.width);
-			tevs_i2c_write_16b(
-				tevs,
-				HOST_COMMAND_ISP_CTRL_PREVIEW_HEIGHT,
-				tevs_sensor_table[tevs->selected_sensor]
-					.frmfmt[tevs->selected_mode]
-					.size.height);
-			tevs_i2c_write_16b(
-				tevs,
-				HOST_COMMAND_ISP_CTRL_PREVIEW_MAX_FPS, fps);
-		}
+	if (ret == 0) {
+		int fps = *tevs_sensor_table[tevs->selected_sensor]
+				  .frmfmt[tevs->selected_mode]
+				  .framerates;
+		dev_dbg(tc_dev->dev, "%s() width=%d, height=%d\n",
+			__func__,
+			tevs_sensor_table[tevs->selected_sensor]
+				.frmfmt[tevs->selected_mode]
+				.size.width,
+			tevs_sensor_table[tevs->selected_sensor]
+				.frmfmt[tevs->selected_mode]
+				.size.height);
+		tevs_i2c_write_16b(
+			tevs,
+			HOST_COMMAND_ISP_CTRL_PREVIEW_SENSOR_MODE,
+			tevs_sensor_table[tevs->selected_sensor]
+				.frmfmt[tevs->selected_mode]
+				.mode);
+		tevs_i2c_write_16b(
+			tevs,
+			HOST_COMMAND_ISP_CTRL_PREVIEW_WIDTH,
+			tevs_sensor_table[tevs->selected_sensor]
+				.frmfmt[tevs->selected_mode]
+				.size.width);
+		tevs_i2c_write_16b(
+			tevs,
+			HOST_COMMAND_ISP_CTRL_PREVIEW_HEIGHT,
+			tevs_sensor_table[tevs->selected_sensor]
+				.frmfmt[tevs->selected_mode]
+				.size.height);
+		tevs_i2c_write_16b(
+			tevs,
+			HOST_COMMAND_ISP_CTRL_PREVIEW_MAX_FPS, fps);
+	}
 
 	return ret;
 }
@@ -1626,8 +1637,6 @@ static const char *const bsl_mode_strings[] = {
 	NULL,
 };
 
-
-
 static int tevs_s_ctrl(struct v4l2_ctrl *ctrl)
 {
 	struct tevs *tevs = _to_tevs_priv(ctrl);
@@ -2075,21 +2084,23 @@ static int tevs_setup(struct tevs *tevs)
 
 	tevs->reset_gpio =
 		devm_gpiod_get_optional(tevs->dev, "reset", GPIOD_OUT_LOW);
-	if (IS_ERR(tevs->reset_gpio)) {
+	if (IS_ERR_OR_NULL(tevs->reset_gpio)) {
 		ret = PTR_ERR(tevs->reset_gpio);
-		if (ret != -EPROBE_DEFER)
+		if (ret != -EPROBE_DEFER) {
 			dev_err(tevs->dev, "Cannot get reset GPIO (%d)", ret);
-		tegracam_device_unregister(tevs->tc_dev);
+			ret = -EINVAL;
+		}
 		return ret;
 	}
 
 	tevs->standby_gpio =
 		devm_gpiod_get_optional(tevs->dev, "standby", GPIOD_OUT_LOW);
-	if (IS_ERR(tevs->standby_gpio)) {
+	if (IS_ERR_OR_NULL(tevs->standby_gpio)) {
 		ret = PTR_ERR(tevs->standby_gpio);
-		if (ret != -EPROBE_DEFER)
-			dev_err(tevs->dev, "Cannot get standby GPIO (%d)", ret);
-		tegracam_device_unregister(tevs->tc_dev);
+		if (ret != -EPROBE_DEFER) {
+			dev_err(tevs->dev, "Cannot get reset GPIO (%d)", ret);
+			ret = -EINVAL;
+		}
 		return ret;
 	}
 
@@ -2143,7 +2154,7 @@ static int tevs_setup(struct tevs *tevs)
 	ret = tevs_i2c_write_16b(tevs,
 				HOST_COMMAND_ISP_CTRL_MIPI_FREQ,
 				tevs->data_frequency);
-	msleep(50);
+	msleep(100);
 	if (tevs_check_boot_state(tevs) != 0) {
 		dev_err(tevs->dev, "check tevs bootup status failed\n");
 		return -EINVAL;
@@ -2262,7 +2273,7 @@ static int tevs_probe(struct i2c_client *client,
 		return ret;
 	}
 
-	tevs->dev = &tc_dev->client->dev;
+	tevs->dev = dev;
 	tevs->tc_dev = tc_dev;
 	tevs->s_data = tc_dev->s_data;
 	tevs->regmap = tc_dev->s_data->regmap;
@@ -2272,8 +2283,11 @@ static int tevs_probe(struct i2c_client *client,
 	tegracam_set_privdata(tc_dev, (void *)tevs);
 
 	ret = tevs_setup(tevs);
-	if(ret != 0)
+	if(ret != 0) {
+		tegracam_device_unregister(tc_dev);
+		dev_err(dev, "tevs setup failed\n");
 		return ret;
+	}
 
 	ret = tegracam_v4l2subdev_register(tc_dev, true);
 	if (ret) {
