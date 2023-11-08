@@ -73,12 +73,13 @@ static struct __reg8b_v __9096x_i2c_setting [] = {
 	{.reg = 0x7C, .value = 0x38}, //PORT_CONFIG2
 	{.reg = 0x7D, .value = 0x80}, //PORT_PASS_CTL
 
-	// {.reg = 0x10, .value = 0x91}, //FS_HIGH_TIME_1
-	// {.reg = 0x19, .value = 0x0A}, //FS_HIGH_TIME_1
-	// {.reg = 0x1A, .value = 0xD7}, //FS_HIGH_TIME_0
-	// {.reg = 0x1B, .value = 0x61}, //FS_LOW_TIME_1
-	// {.reg = 0x1C, .value = 0xA0}, //FS_LOW_TIME_0
-	// {.reg = 0x18, .value = 0x01}, //FS_CTL
+	{.reg = 0x15, .value = 0x90}, //GPIO5_PIN_CTL
+	{.reg = 0x17, .value = 0x91}, //GPIO7_PIN_CTL
+	{.reg = 0x19, .value = 0x0A}, //FS_HIGH_TIME_1
+	{.reg = 0x1A, .value = 0xD7}, //FS_HIGH_TIME_0
+	{.reg = 0x1B, .value = 0x61}, //FS_LOW_TIME_1
+	{.reg = 0x1C, .value = 0xA0}, //FS_LOW_TIME_0
+	{.reg = 0x18, .value = 0x01}, //FS_CTL
 
 	{.reg = 0xB0, .value = 0x1C}, // IND_ACC_CTL
 };
