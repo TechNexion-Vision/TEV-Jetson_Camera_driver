@@ -133,8 +133,8 @@ static const struct camera_common_frmfmt sensor_frmfmt[] = {
 };
 
 static const struct camera_common_frmfmt ar0144_frmfmt[] = {
-	{{640, 480}, &__60fps, 1, 0, 0},
-	{{1280, 720}, &__60fps, 1, 0, 0},
+	{{640, 480}, &__60fps, 1, 0, 2},
+	{{1280, 720}, &__60fps, 1, 0, 1},
 	{{1280, 800}, &__60fps, 1, 0, 0},
 };
 static const struct camera_common_frmfmt ar0234_frmfmt[] = {
