@@ -709,14 +709,17 @@ static int tevs_start_streaming(struct tegracam_device *tc_dev)
 		int fps = *tevs_sensor_table[tevs->selected_sensor]
 				  .frmfmt[tevs->selected_mode]
 				  .framerates;
-		dev_dbg(tc_dev->dev, "%s() width=%d, height=%d\n",
+		dev_dbg(tc_dev->dev, "%s() width=%d, height=%d, mode=%d\n",
 			__func__,
 			tevs_sensor_table[tevs->selected_sensor]
 				.frmfmt[tevs->selected_mode]
 				.size.width,
 			tevs_sensor_table[tevs->selected_sensor]
 				.frmfmt[tevs->selected_mode]
-				.size.height);
+				.size.height,
+			tevs_sensor_table[tevs->selected_sensor]
+				.frmfmt[tevs->selected_mode]
+				.mode);
 		tevs_i2c_write_16b(
 			tevs,
 			HOST_COMMAND_ISP_CTRL_PREVIEW_SENSOR_MODE,
