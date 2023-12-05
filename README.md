@@ -21,6 +21,6 @@
 
 ## WIKI Pages
 
-[TechNexion cameras with Nvidia EVK guide](https://developer.technexion.com/docs/tevi-arxxxx-cameras-on-nvidia-jetson-nano)
+[TechNexion cameras with Nvidia EVK guide](https://developer.technexion.com/docs/tevi-cam-on-nvidia-jetson-nano)
 
 [TechNexion Nvidia products guide](https://developer.technexion.com/docs/1)
