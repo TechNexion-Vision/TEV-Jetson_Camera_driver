@@ -188,7 +188,7 @@ static int vh_check_port_lock_pass(struct vh_st *this)
 		dev_err(dev, "of_i2c: invalid vc_port on %pOF\n", dev->of_node);
 		return ret;
 	}
-	dev_info(dev, "vc_port=0x%x, addr=%x\n", vc_port, this->i2c_client->addr);
+	dev_dbg(dev, "vc_port=0x%x, addr=%x\n", vc_port, this->i2c_client->addr);
 
 	__i2c_write(this->i2c_client, 0x4c, (vc_port << 4) | (1 << vc_port));
 	msleep(200);
@@ -206,7 +206,7 @@ static int vh_check_port_lock_pass(struct vh_st *this)
 				 this->ser_alias_addr);
 		ret = 0;
 	} else {
-		dev_info(dev, "Port %d disconnect:0x4D=%x\n", vc_port, v);
+		dev_err(dev, "Port %d disconnect:0x4D=%x\n", vc_port, v);
 		ret = -EIO;
 	}
 
@@ -217,8 +217,8 @@ static int vh_polling_connect(struct vh_st *this)
 {
 	int state_flag = 0;
 	u8 v = 0;
-	int retry_time = 20;
-	dev_info(&this->i2c_client->dev, "%s\n", __func__);
+	int retry_time = 5;
+	dev_dbg(&this->i2c_client->dev, "%s\n", __func__);
 
 	while (state_flag != -1 && retry_time != 0) {
 		msleep(50);
