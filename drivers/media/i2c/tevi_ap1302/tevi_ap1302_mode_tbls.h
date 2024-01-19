@@ -27,38 +27,62 @@ static const int __10fps = 10;
 static const int __20fps = 20;
 static const int __30fps = 30;
 static const int __60fps = 60;
+static const int __120fps = 120;
+
 static const struct camera_common_frmfmt sensor_frmfmt[] = {
+	{{640, 480}, &__60fps, 1, 0, 0},
 	{{1280, 720}, &__60fps, 1, 0, 0},
-	{{1920, 1080}, &__60fps, 1, 0, 1},
+	{{1920, 1080}, &__60fps, 1, 0, 0},
 };
 
 static const struct camera_common_frmfmt ar0144_frmfmt[] = {
+	{{640, 480}, &__60fps, 1, 0, 0},
 	{{1280, 720}, &__60fps, 1, 0, 0},
-	{{1280, 800}, &__60fps, 1, 0, 1},
+	{{1280, 800}, &__60fps, 1, 0, 0},
 };
 static const struct camera_common_frmfmt ar0234_frmfmt[] = {
-	{{1280, 720}, &__60fps, 1, 0, 0},
-	{{1920, 1080}, &__60fps, 1, 0, 1},
-	{{1920, 1200}, &__60fps, 1, 0, 2},
+	{{640, 480}, &__120fps, 1, 0, 1},
+	{{1280, 720}, &__120fps, 1, 0, 0},
+	{{1920, 1080}, &__60fps, 1, 0, 0},
+	{{1920, 1200}, &__60fps, 1, 0, 0},
 };
 static const struct camera_common_frmfmt ar0521_frmfmt[] = {
-	{{1280, 720}, &__30fps, 1, 0, 0},
+	{{640, 480}, &__60fps, 1, 0, 3},
+	{{1280, 720}, &__30fps, 1, 0, 3},
+	{{1280, 960}, &__30fps, 1, 0, 3},
 	{{1920, 1080}, &__30fps, 1, 0, 1},
-	{{2592, 1944}, &__20fps, 1, 0, 2},
+	{{2560, 1440}, &__20fps, 1, 0, 1},
+	{{2592, 1944}, &__20fps, 1, 0, 1},
+};
+static const struct camera_common_frmfmt ar0522_frmfmt[] = {
+	{{640, 480}, &__30fps, 1, 0, 3},
+	{{1280, 720}, &__30fps, 1, 0, 3},
+	{{1280, 960}, &__30fps, 1, 0, 3},
+	{{1920, 1080}, &__30fps, 1, 0, 1},
+	{{2560, 1440}, &__20fps, 1, 0, 1},
+	{{2592, 1944}, &__20fps, 1, 0, 1},
 };
 static const struct camera_common_frmfmt ar0821_frmfmt[] = {
-	{{1280, 720}, &__30fps, 1, 0, 0},
+	{{640, 480}, &__30fps, 1, 0, 2},
+	{{1280, 720}, &__30fps, 1, 0, 2},
+	{{1920, 1080}, &__30fps, 1, 0, 2},
+	{{2560, 1440}, &__20fps, 1, 0, 0},
+	{{3840, 2160}, &__20fps, 1, 0, 0},
+};
+static const struct camera_common_frmfmt ar0822_frmfmt[] = {
+	{{640, 480}, &__30fps, 1, 0, 1},
+	{{1280, 720}, &__30fps, 1, 0, 1},
 	{{1920, 1080}, &__30fps, 1, 0, 1},
-	{{2560, 1440}, &__20fps, 1, 0, 2},
-	{{3840, 2160}, &__20fps, 1, 0, 3},
+	{{2560, 1440}, &__20fps, 1, 0, 0},
+	{{3840, 2160}, &__20fps, 1, 0, 0},
 };
 static const struct camera_common_frmfmt ar1335_frmfmt[] = {
-	{{1280, 720}, &__30fps, 1, 0, 0},
-	{{1920, 1080}, &__30fps, 1, 0, 1},
-	{{2560, 1440}, &__30fps, 1, 0, 2},
-	{{3840, 2160}, &__20fps, 1, 0, 3},
-	{{4192, 3120}, &__10fps, 1, 0, 4},
-	{{4208, 3120}, &__10fps, 1, 0, 5},
+	{{640, 480}, &__30fps, 1, 0, 4},
+	{{1280, 720}, &__30fps, 1, 0, 4},
+	{{1920, 1080}, &__30fps, 1, 0, 3},
+	{{2560, 1440}, &__30fps, 1, 0, 1},
+	{{3840, 2160}, &__20fps, 1, 0, 0},
+	{{4208, 3120}, &__10fps, 1, 0, 0},
 };
 
 struct sensor_info {
@@ -85,8 +109,8 @@ static struct sensor_info ap1302_sensor_table[] = {
 	},
 	{
 		.sensor_name = "TEVI-AR0522",
-		.frmfmt = ar0521_frmfmt,
-		.res_list_size = ARRAY_SIZE(ar0521_frmfmt)
+		.frmfmt = ar0522_frmfmt,
+		.res_list_size = ARRAY_SIZE(ar0522_frmfmt)
 	},
 	{
 		.sensor_name = "TEVI-AR0821",
@@ -95,8 +119,8 @@ static struct sensor_info ap1302_sensor_table[] = {
 	},
 	{
 		.sensor_name = "TEVI-AR0822",
-		.frmfmt = ar0821_frmfmt,
-		.res_list_size = ARRAY_SIZE(ar0821_frmfmt)
+		.frmfmt = ar0822_frmfmt,
+		.res_list_size = ARRAY_SIZE(ar0822_frmfmt)
 	},
 	{
 		.sensor_name = "TEVI-AR1335",
