@@ -9,6 +9,12 @@
 
 ### Version 0.0.1 (Beta)
 ---
+
+## Support JetPack Version
+
+- JetPack 5.3.1
+- Ongoing...
+
 ## Support Camera Modules
 
 #### MIPI Cameras
@@ -33,7 +39,7 @@
 ## Supported NVIDIA Jetson Developer Kit
 
 - [Nvidia Jetson Orin NANO](https://developer.nvidia.com/embedded/learn/get-started-jetson-orin-nano-devkit)
-- [Nvidia Jetson Xavier NX ](https://developer.nvidia.com/embedded/learn/get-started-jetson-xavier-nx-devkit) ( reached EOL)
+- [Nvidia Jetson Xavier NX ](https://developer.nvidia.com/embedded/learn/get-started-jetson-xavier-nx-devkit) (reached EOL)
 
 ## Supported TechNexion TEK Series
 
@@ -43,13 +49,50 @@
 ---
 ## Install TN Camera on Jetson Developer Kit
 
+### Preparation
+
+**TEV-RPI22 Adaptor for TEVS**
+
+> Connect TEVS camera and TEV-RPI22 adaptor to Jetson Orin NANO directly. 
+
+[![RPI-22](https://www.technexion.com/wp-content/uploads/2023/11/tevs-ar0144-c-s33-ir-rpi22.png)](https://www.technexion.com/products/embedded-vision/mipi-csi2/evk/tevs-ar0144-c-s33-ir-rpi22/)
+
+**VLS3-ORIN-EVK Adaptor for VLS3**
+
+> Follow the [video](https://www.youtube.com/watch?v=Ggu97E-KmsA) to connect VLS3 cameras and VLS3-ORIN-EVK adaptor to Jetson ORIN NANO.
+
+[![VLS3-ORIN-EVK](https://img.youtube.com/vi/Ggu97E-KmsA/0.jpg)](https://www.youtube.com/watch?v=Ggu97E-KmsA)
+
+
+
 #### Method 1
-Follow [TN BSP install steps](https://github.com/TechNexion-Vision/nvidia_jetson_tn_bsp)
+
+1. Download pre-built modules.
+
+```
+wget https://download.technexion.com/demo_software/EVK/NVIDIA/OrinNano/pre-built-modules/latest/tn-camera-modules.tar.gz
+```
+
+2. uncompress the modules.
+
+```shell
+tar -xf tn-camera-modules.tar.gz
+```
+
+3. Run install script.
+
+```shell
+sh tn-install.sh
+```
+Note: You should reboot the device after installation.
 
 #### Method 2
-(TBD)
+
+1. Follow [TN BSP install steps](https://github.com/TechNexion-Vision/nvidia_jetson_tn_bsp)
+
 ---
-## Bring up TN Camera by GStreamer
+
+## Bring up Camera by GStreamer
 
 If you succeed in initialing the camera, you can follow the steps to open the camera.
 
@@ -58,8 +101,8 @@ If you succeed in initialing the camera, you can follow the steps to open the ca
 ```shell
 $ gst-device-monitor-1.0 Video/Source
 ```
-2. Bring up the camera by Gstreamer pipeline:
-   
+2. Bring up the camera (/dev/video0) by Gstreamer pipeline:
+
 ```shell
 DISPLAY=:0 gst-launch-1.0 v4l2src device=/dev/video0 ! \
 "video/x-raw, format=(string)UYVY, width=(int)2592, height=(int)1944" ! \
