@@ -55,21 +55,27 @@
 
 > Connect TEVS camera and TEV-RPI22 adaptor to **Jetson Orin Nano Developer Kit** directly. 
 
-[![RPI-22](https://www.technexion.com/wp-content/uploads/2023/11/tevs-ar0144-c-s33-ir-rpi22.png)](https://www.technexion.com/products/embedded-vision/mipi-csi2/evk/tevs-ar0144-c-s33-ir-rpi22/)
+<a href="https://www.technexion.com/products/embedded-vision/mipi-csi2/evk/tevs-ar0144-c-s33-ir-rpi22/" target="_blank">
+ <img src="https://www.technexion.com/wp-content/uploads/2023/11/tevs-ar0144-c-s33-ir-rpi22.png" width="400" height="400" />
+</a>
 
 **VLS3-ORIN-EVK Adaptor for VLS3**
 
 > Follow the [video](https://www.youtube.com/watch?v=Ggu97E-KmsA) to connect VLS3 cameras and VLS3-ORIN-EVK adaptor to **Jetson Orin Nano Developer Kit**.
 
-[![VLS3-ORIN-EVK](https://img.youtube.com/vi/Ggu97E-KmsA/0.jpg)](https://www.youtube.com/watch?v=Ggu97E-KmsA)
+<a href="http://www.youtube.com/watch?feature=player_embedded&v=Ggu97E-KmsA" target="_blank">
+ <img src="http://img.youtube.com/vi/Ggu97E-KmsA/mqdefault.jpg" alt="Watch the video"  width="640" height="360" border="10" />
+</a>
 
+---
 
-
-#### Method 1 - Using Pre-built modules
-
-##### Preparation
+#### Preparation
 
 We recommend following the [Getting Started Guide](https://developer.nvidia.com/embedded/learn/get-started-jetson-orin-nano-devkit) for Jetson Orin Nano Developer Kit.
+
+After that, you can follow the below method to install TechNextion Cameras Driver.
+
+#### Method 1 - Using Pre-built modules
 
 1. Download pre-built modules.
 
