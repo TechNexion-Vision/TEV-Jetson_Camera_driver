@@ -64,7 +64,7 @@
 > Follow the [video](https://www.youtube.com/watch?v=Ggu97E-KmsA) to connect VLS3 cameras and VLS3-ORIN-EVK adaptor to **Jetson Orin Nano Developer Kit**.
 
 <a href="http://www.youtube.com/watch?feature=player_embedded&v=Ggu97E-KmsA" target="_blank">
- <img src="http://img.youtube.com/vi/Ggu97E-KmsA/mqdefault.jpg" alt="Watch the video"  width="640" height="360" border="10" />
+ <img src="https://img.youtube.com/vi/Ggu97E-KmsA/0.jpg" alt="Watch the video"  width="640" height="360" />
 </a>
 
 ---
