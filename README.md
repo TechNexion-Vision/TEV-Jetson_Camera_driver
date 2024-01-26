@@ -12,8 +12,8 @@
 
 ## Support JetPack Version
 
-- JetPack 5.3.1
-- Ongoing...
+- [JetPack 5.1.1](https://developer.nvidia.com/embedded/jetpack-sdk-511) [[L4T 35.3.1]](https://developer.nvidia.com/embedded/jetson-linux-r3531)
+- [JetPack 5.1.2](https://developer.nvidia.com/embedded/jetpack-sdk-512) [[L4T 35.4.1]](https://developer.nvidia.com/embedded/jetson-linux-r3541)
 
 ## Support Camera Modules
 
@@ -49,23 +49,27 @@
 ---
 ## Install TN Camera on Jetson Developer Kit
 
-### Preparation
+### Adaptor for Nvidia **Jetson ORIN NANO Development Kit**
 
 **TEV-RPI22 Adaptor for TEVS**
 
-> Connect TEVS camera and TEV-RPI22 adaptor to Jetson Orin NANO directly. 
+> Connect TEVS camera and TEV-RPI22 adaptor to **Jetson Orin Nano Developer Kit** directly. 
 
 [![RPI-22](https://www.technexion.com/wp-content/uploads/2023/11/tevs-ar0144-c-s33-ir-rpi22.png)](https://www.technexion.com/products/embedded-vision/mipi-csi2/evk/tevs-ar0144-c-s33-ir-rpi22/)
 
 **VLS3-ORIN-EVK Adaptor for VLS3**
 
-> Follow the [video](https://www.youtube.com/watch?v=Ggu97E-KmsA) to connect VLS3 cameras and VLS3-ORIN-EVK adaptor to Jetson ORIN NANO.
+> Follow the [video](https://www.youtube.com/watch?v=Ggu97E-KmsA) to connect VLS3 cameras and VLS3-ORIN-EVK adaptor to **Jetson Orin Nano Developer Kit**.
 
 [![VLS3-ORIN-EVK](https://img.youtube.com/vi/Ggu97E-KmsA/0.jpg)](https://www.youtube.com/watch?v=Ggu97E-KmsA)
 
 
 
-#### Method 1
+#### Method 1 - Using Pre-built modules
+
+##### Preparation
+
+We recommend following the [Getting Started Guide](https://developer.nvidia.com/embedded/learn/get-started-jetson-orin-nano-devkit) for Jetson Orin Nano Developer Kit.
 
 1. Download pre-built modules.
 
@@ -81,14 +85,21 @@ tar -xf tn-camera-modules.tar.gz
 
 3. Run install script.
 
-```shell
+```shell'
+cd tn_camera_modules/
 sh tn-install.sh
 ```
 Note: You should reboot the device after installation.
 
-#### Method 2
+#### Method 2 - Build drivers from source code
 
 1. Follow [TN BSP install steps](https://github.com/TechNexion-Vision/nvidia_jetson_tn_bsp)
+
+2. Clone the source codes.
+
+```shell
+git clone https://github.com/TechNexion-Vision/TEV-Jetson_Camera_driver.git
+```
 
 ---
 
