@@ -80,7 +80,7 @@ After that, you can follow the below method to install TechNextion Cameras Drive
 1. Download pre-built modules.
 
 ```
-wget https://download.technexion.com/demo_software/EVK/NVIDIA/OrinNano/pre-built-modules/latest/tn-camera-modules.tar.gz
+wget https://download.technexion.com/demo_software/EVK/NVIDIA/OrinNano/pre-built-modules/latest/tn_camera_modules.tar.gz
 ```
 
 2. uncompress the modules.
