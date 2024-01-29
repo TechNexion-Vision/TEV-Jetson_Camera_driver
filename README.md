@@ -153,12 +153,66 @@ If you succeed in initialing the camera, you can follow the steps to open the ca
 
 ```shell
 $ gst-device-monitor-1.0 Video/Source
+Device found:
+
+        name  : vi-output, tevs 9-0048
+        class : Video/Source
+        caps  : video/x-raw, format=(string)UYVY, width=(int)1280, height=(int)800, framerate=(fraction)60/1;
+                video/x-raw, format=(string)UYVY, width=(int)1280, height=(int)720, framerate=(fraction)60/1;
+                video/x-raw, format=(string)UYVY, width=(int)640, height=(int)480, framerate=(fraction)60/1;
+                video/x-raw, format=(string)UYVY, width=(int)1280, height=(int)800, framerate=(fraction)60/1;
+                video/x-raw, format=(string)UYVY, width=(int)1280, height=(int)720, framerate=(fraction)60/1;
+                video/x-raw, format=(string)UYVY, width=(int)640, height=(int)480, framerate=(fraction)60/1;
+                video/x-raw, format=(string)NV16, width=(int)1280, height=(int)800, framerate=(fraction)60/1;
+                video/x-raw, format=(string)NV16, width=(int)1280, height=(int)720, framerate=(fraction)60/1;
+                video/x-raw, format=(string)NV16, width=(int)640, height=(int)480, framerate=(fraction)60/1;
+        properties:
+                udev-probed = true
+                device.bus_path = platform-tegra-capture-vi
+                sysfs.path = /sys/devices/platform/tegra-capture-vi/video4linux/video0
+                device.subsystem = video4linux
+                device.product.name = "vi-output\,\ tevs\ 9-003e"
+                device.capabilities = :capture:
+                device.api = v4l2
+                device.path = /dev/video0
+                v4l2.device.driver = tegra-video
+                v4l2.device.card = "vi-output\,\ tevs\ 9-003e"
+                v4l2.device.bus_info = platform:tegra-capture-vi:1
+                v4l2.device.version = 330344 (0x00050a68)
+                v4l2.device.capabilities = 2216689665 (0x84200001)
+                v4l2.device.device_caps = 69206017 (0x04200001)
+        gst-launch-1.0 v4l2src ! ...
 ```
-2. Bring up the camera (/dev/video0) by Gstreamer pipeline:
+2. Bring up the camera (/dev/video0) with 1280x720 by Gstreamer pipeline:
 
 ```shell
 DISPLAY=:0 gst-launch-1.0 v4l2src device=/dev/video0 ! \
-"video/x-raw, format=(string)UYVY, width=(int)2592, height=(int)1944" ! \
+"video/x-raw, format=(string)UYVY, width=(int)1280, height=(int)720" ! \
+nvvidconv ! nv3dsink sync=false
+```
+
+### Troubleshooting
+
+**1. Cannot Find Cameras**
+
+If you cannot bring up the cameras, you can check if the video device does exist.
+
+```shell
+$ ls /dev/video*  # List all video devices
+/dev/video0  /dev/video1
+```
+If you cannot see the devices, you should check if the drivers have been probed.
+
+**2. Occur Error: Could not get EGL display connection**
+
+If you occurred the errors `nvbufsurftransform: Could not get EGL display connection` by rununing the Gstreamer command, you can modify the parameter 'DISPLAY' by the command:
+
+```shell
+# Check and Set environment parameter for 'DISPLAY'
+$ export DISPLAY=$(w| tr -s ' '| cut -d ' ' -f 3)
+# Run Gstreamer pipeline
+$ gst-launch-1.0 v4l2src device=/dev/video0 ! \
+"video/x-raw, format=(string)UYVY, width=(int)1280, height=(int)720" ! \
 nvvidconv ! nv3dsink sync=false
 ```
 
