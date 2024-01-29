@@ -137,11 +137,7 @@ Note: You should reboot the device after installation.
 
 1. Follow [TN BSP install steps](https://github.com/TechNexion-Vision/nvidia_jetson_tn_bsp)
 
-2. Clone the source codes.
-
-```shell
-git clone https://github.com/TechNexion-Vision/TEV-Jetson_Camera_driver.git
-```
+2. After downloading, you can build kernel image and modules manually by following [compile steps](https://developer.technexion.com/docs/compile-step).
 
 ---
 
@@ -209,7 +205,7 @@ If you occurred the errors `nvbufsurftransform: Could not get EGL display connec
 
 ```shell
 # Check and Set environment parameter for 'DISPLAY'
-$ export DISPLAY=$(w| tr -s ' '| cut -d ' ' -f 3)
+$ export DISPLAY=$(w| tr -s ' '| cut -d ' ' -f 3 | grep :)
 # Run Gstreamer pipeline
 $ gst-launch-1.0 v4l2src device=/dev/video0 ! \
 "video/x-raw, format=(string)UYVY, width=(int)1280, height=(int)720" ! \
