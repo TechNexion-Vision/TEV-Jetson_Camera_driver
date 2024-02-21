@@ -87,8 +87,8 @@ sh tn_install.sh
 $ sh tn_install.sh
 [sudo] password for ubuntu:
 ****** TechNexion Camera Driver Installation ******
-This installation is easy to install TechnNexion Camera Drivers for Nvidia 
-Jetson NANO Development Kits. Before start to install camera driver, 
+This installation is easy to install TechnNexion Camera Drivers for Nvidia
+Jetson NANO Development Kits. Before start to install camera driver,
 You should BACKUP your image to avoid any file you lost while installing process.
 Do you want to continue?[Y/n]Y
 Continuing with the installation...
@@ -107,7 +107,7 @@ Installed TN-CAM DTBO file Done.
 Select modules:
     [1]: TEVS: TEVS Series MIPI Cameras with TEVS-RPI15 Adaptor
     [2]: TEVI-AP1302: TEVI-AR Series Cameras with TEV-RPI15 Adaptor
-    [3]: TEVI-OV5640: TEVI-OV5640 Cameras with TEV-RPI16 Adaptor
+    [3]: TEVI-OV5640: TEVI-OV5640 Cameras with TEV-RPI15 Adaptor
 Which modules do you select?[default:1]
 ```
    
