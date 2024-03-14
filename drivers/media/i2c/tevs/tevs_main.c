@@ -550,7 +550,7 @@ static int tevs_power_on(struct camera_common_data *s_data)
 	dev_dbg(tevs->dev, "%s()\n", __func__);
 
 	gpiod_set_value_cansleep(tevs->reset_gpio, 1);
-	msleep(100);
+	msleep(250);
 
 	ret = tevs_check_boot_state(tevs);
 	if(ret != 0)
@@ -1252,7 +1252,7 @@ static int tevs_get_flick_mode(struct tevs *tevs, s32 *mode)
 	case TEVS_FLICK_CTRL_MODE_MANUAL:
 		if((val & TEVS_FLICK_CTRL_FREQ_MASK) == TEVS_FLICK_CTRL_FREQ(50))
 			*mode = 1;
-		else if((val & TEVS_FLICK_CTRL_FREQ_MASK)  == TEVS_FLICK_CTRL_FREQ(50))
+		else if((val & TEVS_FLICK_CTRL_FREQ_MASK)  == TEVS_FLICK_CTRL_FREQ(60))
 			*mode = 2;
 		break;
 	case TEVS_FLICK_CTRL_MODE_AUTO:
@@ -2130,7 +2130,7 @@ static int tevs_setup(struct tevs *tevs)
 	if (IS_ERR_OR_NULL(tevs->standby_gpio)) {
 		ret = PTR_ERR(tevs->standby_gpio);
 		if (ret != -EPROBE_DEFER) {
-			dev_err(tevs->dev, "Cannot get reset GPIO (%d)", ret);
+			dev_err(tevs->dev, "Cannot get standby GPIO (%d)", ret);
 			ret = -EINVAL;
 		}
 		return ret;
@@ -2186,7 +2186,7 @@ static int tevs_setup(struct tevs *tevs)
 	ret = tevs_i2c_write_16b(tevs,
 				HOST_COMMAND_ISP_CTRL_MIPI_FREQ,
 				tevs->data_frequency);
-	msleep(100);
+	msleep(250);
 	if (tevs_check_boot_state(tevs) != 0) {
 		dev_err(tevs->dev, "check tevs bootup status failed\n");
 		return -EINVAL;
