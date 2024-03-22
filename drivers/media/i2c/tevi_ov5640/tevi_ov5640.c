@@ -110,11 +110,6 @@ static int sensor_write_table(struct sensor_obj *priv, const struct reg_8 *table
 	return err;
 }
 
-// static struct tegracam_ctrl_ops sensor_ctrl_ops = {
-// 	.numctrls = ARRAY_SIZE(ctrl_cid_list),
-// 	.ctrl_cid_list = ctrl_cid_list,
-// };
-
 static int sensor_power_on(struct camera_common_data *s_data)
 {
 	int err = 0;
@@ -132,15 +127,18 @@ static int sensor_power_on(struct camera_common_data *s_data)
 		return err;
 	}
 
-	if (pw->reset_gpio && pw->pwdn_gpio) {
-		if (gpio_cansleep(pw->reset_gpio) && gpio_cansleep(pw->pwdn_gpio)) {
-			gpio_set_value_cansleep(pw->pwdn_gpio, 0);
+	if (pw->reset_gpio) {
+		if (gpio_cansleep(pw->reset_gpio))
 			gpio_set_value_cansleep(pw->reset_gpio, 0);
-		}
-		else {
-			gpio_set_value(pw->pwdn_gpio, 0);
+		else
 			gpio_set_value(pw->reset_gpio, 0);
-		}
+	}
+
+	if (pw->pwdn_gpio) {
+		if (gpio_cansleep(pw->pwdn_gpio))
+			gpio_set_value_cansleep(pw->pwdn_gpio, 1);
+		else
+			gpio_set_value(pw->pwdn_gpio, 1);
 	}
 
 	if (unlikely(!(pw->avdd || pw->iovdd || pw->dvdd)))
@@ -171,9 +169,9 @@ static int sensor_power_on(struct camera_common_data *s_data)
 skip_power_seqn:
 	if (pw->pwdn_gpio) {
 		if (gpio_cansleep(pw->pwdn_gpio))
-			gpio_set_value_cansleep(pw->pwdn_gpio, 1);
+			gpio_set_value_cansleep(pw->pwdn_gpio, 0);
 		else
-			gpio_set_value(pw->pwdn_gpio, 1);
+			gpio_set_value(pw->pwdn_gpio, 0);
 	}
 
 	msleep(20);
@@ -185,7 +183,7 @@ skip_power_seqn:
 			gpio_set_value(pw->reset_gpio, 1);
 	}
 
-	msleep(250);
+	msleep(100);
 
 	pw->state = SWITCH_ON;
 
@@ -219,15 +217,18 @@ static int sensor_power_off(struct camera_common_data *s_data)
 			return err;
 		}
 	} else {
-		if (pw->reset_gpio && pw->pwdn_gpio) {
-			if (gpio_cansleep(pw->reset_gpio) && gpio_cansleep(pw->pwdn_gpio)) {
-				gpio_set_value_cansleep(pw->pwdn_gpio, 0);
+		if (pw->reset_gpio) {
+			if (gpio_cansleep(pw->reset_gpio))
 				gpio_set_value_cansleep(pw->reset_gpio, 0);
-			}
-			else {
-				gpio_set_value(pw->pwdn_gpio, 0);
+			else
 				gpio_set_value(pw->reset_gpio, 0);
-			}
+		}
+
+		if (pw->pwdn_gpio) {
+			if (gpio_cansleep(pw->pwdn_gpio))
+				gpio_set_value_cansleep(pw->pwdn_gpio, 1);
+			else
+				gpio_set_value(pw->pwdn_gpio, 1);
 		}
 
 		usleep_range(10, 10);
@@ -374,6 +375,7 @@ static struct camera_common_pdata *sensor_parse_dt(
 		goto error;
 	}
 	board_priv_pdata->pwdn_gpio = (unsigned int)gpio;
+	gpio_direction_output(board_priv_pdata->pwdn_gpio, 1);
 
 	gpio = of_get_named_gpio(np, "reset-gpios", 0);
 	if (gpio < 0) {
