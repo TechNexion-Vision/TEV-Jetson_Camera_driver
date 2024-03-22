@@ -25,6 +25,14 @@
 - TEVS-AR0522-M
 - TEVS-AR0821-C
 - TEVS-AR1335-C
+- TEVI-AR0144-C
+- TEVI-AR0234-C
+- TEVI-AR0521-C
+- TEVI-AR0522-C
+- TEVI-AR0522-M
+- TEVI-AR0821-C
+- TEVI-AR1335-C
+- TEVI-OV5640
 
 #### FPD-LINK Cameras
 - VLS3-AR0144-C
@@ -119,13 +127,21 @@ Do you want to continue?[Y/n]Y
 Continuing with the installation...
 Install TN-CAM modules: vizionlink.ko
 Install TN-CAM modules: tevs.ko
+Install TN-CAM modules: tevi_ap1302.ko
+Install TN-CAM modules: tevi_ov5640.ko
 Install TN-CAM DTB file: tevs
 Installed TN-CAM DTB file Done.
 Install TN-CAM DTB file: vl316-vls
 Installed TN-CAM DTB file Done.
+Install TN-CAM DTB file: tevi-ap1302
+Installed TN-CAM DTB file Done.
+Install TN-CAM DTB file: tevi-ov5640
+Installed TN-CAM DTB file Done.
 Select modules:
     [1]: TEVS: TEVS Series MIPI Cameras with RPI22 Adaptor
     [2]: VLS3: VLS3 Series Cameras with VLS3-ORIN-EVK Adaptor
+    [3]: TEVI-AP1302: TEVI-AR Series Cameras with TEV-RPI22 Adaptor
+    [4]: TEVI-OV5640: TEVI-OV5640 Cameras with TEV-RPI22 Adaptor
 Which modules do you select?[default:1]
 ```
    
