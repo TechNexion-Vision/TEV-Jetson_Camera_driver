@@ -721,7 +721,7 @@ static int ops_get_flick_mode(struct sensor_obj *priv, s32 *mode)
 	case AP1302_FLICK_CTRL_MODE_MANUAL:
 		if((val & AP1302_FLICK_CTRL_FREQ_MASK) == AP1302_FLICK_CTRL_FREQ(50))
 			*mode = 1;
-		else if((val & AP1302_FLICK_CTRL_FREQ_MASK)  == AP1302_FLICK_CTRL_FREQ(50))
+		else if((val & AP1302_FLICK_CTRL_FREQ_MASK)  == AP1302_FLICK_CTRL_FREQ(60))
 			*mode = 2;
 		break;
 	case AP1302_FLICK_CTRL_MODE_AUTO:
