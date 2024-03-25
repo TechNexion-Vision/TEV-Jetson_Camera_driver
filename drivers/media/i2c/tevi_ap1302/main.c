@@ -1433,6 +1433,7 @@ static struct camera_common_pdata *sensor_parse_dt(
 		goto error;
 	}
 	board_priv_pdata->reset_gpio = (unsigned int)gpio;
+	gpio_direction_output(board_priv_pdata->reset_gpio, 1);
 
 	err = of_property_read_string(np, "mclk", &board_priv_pdata->mclk_name);
 	if (err)
