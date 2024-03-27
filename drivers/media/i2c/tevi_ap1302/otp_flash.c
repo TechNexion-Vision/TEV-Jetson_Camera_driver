@@ -1,4 +1,3 @@
-#define DEBUG
 #include <linux/i2c.h>
 #include "otp_flash.h"
 
