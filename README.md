@@ -86,9 +86,9 @@
 
 We provide pre-built images to install quickly on Jetson Orin Nano Developer Kit.
 
-[TEV-RPI22 + TEVS Cameras](https://download.technexion.com/demo_software/EVK/NVIDIA/OrinNano/TEV-RPI22_Camera_Series/)
+[TEV-RPI22 + TEVS Cameras](https://download.technexion.com/demo_software/EVK/NVIDIA/OrinNano/TEV-RPI22_Camera_Series/DiskImage/TEV-RPI22-TEVS_ubuntu-20.04_dp_SD_diskimg.zip)
 
-[VLS3-ORIN-EVK + VLS3 Cameras](https://download.technexion.com/demo_software/EVK/NVIDIA/OrinNano/VLS3-ORIN-EVK/)
+[VLS3-ORIN-EVK + VLS3 Cameras](https://download.technexion.com/demo_software/EVK/NVIDIA/OrinNano/VLS3-ORIN-EVK/DiskImage/VLS3-ORIN-EVK-VLS3_ubuntu-20.04_dp_SD_diskimg.zip)
 
 ---
 
