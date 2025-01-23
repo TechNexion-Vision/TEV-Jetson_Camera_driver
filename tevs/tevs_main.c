@@ -432,6 +432,18 @@ static int tevs_i2c_write_16b(struct tevs *tevs, u16 reg, u16 val)
 	return 0;
 }
 
+static int tevs_check_trigger_mode(struct tevs *tevs)
+{
+	u16 val;
+	dev_dbg(tevs->dev, "%s()\n", __func__);
+
+	tevs_i2c_read_16b(tevs, TEVS_TRIGGER_CTRL, &val);
+	if ((val & 0x03) == 0x00)
+		return 0;
+	else
+		return 1;
+}
+
 static int tevs_enable_trigger_mode(struct tevs *tevs, int enable)
 {
 	int ret = 0;
@@ -815,7 +827,7 @@ static int tevs_start_streaming(struct tegracam_device *tc_dev)
 	tevs->exp_time->cur.val = be32_to_cpup((__be32 *)exp) &
 			TEVS_AE_MANUAL_EXP_TIME_MASK;
 
-	if(!(tevs->hw_reset_mode | tevs->trigger_mode))
+	if (!(tevs_check_trigger_mode(tevs) | tevs->hw_reset_mode))
 		ret = tevs_standby(tevs, 0);
 
 	return ret;
@@ -826,7 +838,7 @@ static int tevs_stop_streaming(struct tegracam_device *tc_dev)
 	struct tevs *tevs = tc_dev->priv;
 	int ret = 0;
 
-	if(!(tevs->hw_reset_mode | tevs->trigger_mode))
+	if (!(tevs_check_trigger_mode(tevs) | tevs->hw_reset_mode))
 			ret = tevs_standby(tevs, 1);
 	return ret;
 }
@@ -1933,7 +1945,7 @@ static int tevs_probe(struct i2c_client *client,
 		goto error_probe;
 	}
 
-	if(!(tevs->hw_reset_mode | tevs->trigger_mode)) {
+	if (!(tevs_check_trigger_mode(tevs) | tevs->hw_reset_mode)) {
 		ret = tevs_standby(tevs, 1);
 		if (ret != 0) {
 			dev_err(tevs->dev, "set standby mode failed\n");
