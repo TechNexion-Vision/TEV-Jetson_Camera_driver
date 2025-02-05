@@ -50,7 +50,7 @@
 > Connect TN camera with adaptor to **Jetson Nano Developer Kit** directly. 
 
 <a href="https://www.technexion.com/products/embedded-vision/mipi-csi2/evk/tevs-ar0521-c-s85-ir-rpi15/" target="_blank">
- <img src="https://www.technexion.com/wp-content/uploads/2023/11/tevs-ar0521-c-s85-ir-rpi15.png" width="400" height="400" />
+ <img src="https://www.technexion.com/wp-content/uploads/2024/11/tevs-ar0521-c-s85-ir-rpi15.png" width="400" height="400" />
 </a>
 
 ---
