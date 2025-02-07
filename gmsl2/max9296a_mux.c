@@ -321,7 +321,7 @@ static int max_des_init(struct max_des_priv *priv)
 	return 0;
 }
 
-static int max_ser_change_address(struct i2c_client *client, struct regmap *regmap, u8 addr)
+static int max_ser_change_address(struct i2c_client *client, struct regmap *regmap, u8 addr, u8 id)
 {
 	int ret;
 
@@ -331,14 +331,12 @@ static int max_ser_change_address(struct i2c_client *client, struct regmap *regm
 
 	client->addr = addr;
 
-	if (addr == 0x42) {
-		regmap_update_bits(regmap, 0x7b, GENMASK(2, 0), 0x03);
-		regmap_update_bits(regmap, 0x83, GENMASK(2, 0), 0x03);
-		regmap_update_bits(regmap, 0x8b, GENMASK(2, 0), 0x03);
-		regmap_update_bits(regmap, 0x93, GENMASK(2, 0), 0x03);
-		regmap_update_bits(regmap, 0xa3, GENMASK(2, 0), 0x03);
-		regmap_update_bits(regmap, 0xab, GENMASK(2, 0), 0x03);
-	}
+	regmap_update_bits(regmap, 0x7b, GENMASK(2, 0), id);
+	regmap_update_bits(regmap, 0x83, GENMASK(2, 0), id);
+	regmap_update_bits(regmap, 0x8b, GENMASK(2, 0), id);
+	regmap_update_bits(regmap, 0x93, GENMASK(2, 0), id);
+	regmap_update_bits(regmap, 0xa3, GENMASK(2, 0), id);
+	regmap_update_bits(regmap, 0xab, GENMASK(2, 0), id);
 
 	return 0;
 }
@@ -388,7 +386,7 @@ static int max_ser_wait(struct i2c_client *client, struct regmap *regmap, u8 add
 
 static int max_des_init_link_ser_xlate(struct max_des_priv *priv,
 					struct max_des_link *link,
-					u8 power_up_addr, u8 new_addr)
+					u8 power_up_addr, u8 new_addr, u8 source_id)
 {
 	u8 addrs[] = { power_up_addr, new_addr };
 	struct i2c_client *client;
@@ -441,7 +439,7 @@ static int max_des_init_link_ser_xlate(struct max_des_priv *priv,
 	}
 
 	if (power_up_addr != new_addr) {
-		ret = max_ser_change_address(client, regmap, new_addr);
+		ret = max_ser_change_address(client, regmap, new_addr, source_id);
 		if (ret) {
 			link->enabled = false;
 			dev_err(priv->dev, "Failed to change serializer address: %d\n", ret);
@@ -462,11 +460,13 @@ static int max_des_parse_link_ser_xlate(struct max_des_priv *priv)
 {
 	struct property *local;
 	struct property *remote;
+	struct property *source;
 	struct max_i2c_xlate *xlate;
 	unsigned int i;
 	int ret;
 	u32 local_addr;
 	u32 remote_addr;
+	u32 source_id;
 
 	dev_dbg(priv->dev, "%s()\n", __func__);
 
@@ -476,8 +476,11 @@ static int max_des_parse_link_ser_xlate(struct max_des_priv *priv)
 	remote = of_find_property(priv->dev->of_node,
 				  "i2c-addr-alias-map-remote",
 				  &ret);
+	source = of_find_property(priv->dev->of_node,
+				  "i2c-addr-alias-source-id",
+				  &ret);
 
-	if (local == NULL || remote == NULL) {
+	if (local == NULL || remote == NULL || source == NULL) {
 		dev_dbg(priv->dev, "find not property of alias map\n");
 		return 0;
 	}
@@ -501,15 +504,22 @@ static int max_des_parse_link_ser_xlate(struct max_des_priv *priv)
 		if (ret != 0 || remote_addr > 0x7f)
 			break;
 
+		ret = of_property_read_u32_index(priv->dev->of_node,
+						 "i2c-addr-alias-source-id",
+						 i, &source_id);
+		if (ret != 0 || source_id > 0x7)
+			break;
+
 		xlate = &link->ser_xlate;
 		xlate->src = (u8)(local_addr & 0x7f);
 		xlate->dst = (u8)(remote_addr & 0x7f);
+		xlate->id = (u8)(source_id & 0x7);
 
 		dev_info(priv->dev, "i2c address alias "
-			"index: %d local: 0x%x remote: 0x%x\n",
-			i, xlate->dst, xlate->src);
+			"index: %d local: 0x%x remote: 0x%x id: 0x%x\n",
+			i, xlate->dst, xlate->src, xlate->id);
 
-		ret = max_des_init_link_ser_xlate(priv, link, xlate->dst, xlate->src);
+		ret = max_des_init_link_ser_xlate(priv, link, xlate->dst, xlate->src, xlate->id);
 		if (ret != 0) {
 			link->enabled = false;
 			continue;

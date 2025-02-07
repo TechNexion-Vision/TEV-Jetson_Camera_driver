@@ -50,6 +50,7 @@ struct pinfunction {
 struct max_i2c_xlate {
 	u8 src;
 	u8 dst;
+	u8 id;
 };
 
 struct max_format {
