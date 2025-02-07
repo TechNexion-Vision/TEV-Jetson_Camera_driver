@@ -50,7 +50,7 @@ struct max96724_priv {
 	bool i2c_addr_change;
 	unsigned int i2c_addr;
 
-	int reset_gpio;
+	struct gpio_desc *reset_gpio;
 };
 
 #define des_to_priv(des) \
@@ -2365,15 +2365,18 @@ static int max96724_probe(struct i2c_client *client)
 	priv->des_priv.regmap = priv->regmap;
 	priv->des_priv.ops = &max96724_ops;
 
-	priv->reset_gpio = of_get_named_gpio(dev->of_node, "reset-gpios", 0);
-	if (priv->reset_gpio < 0) {
-		dev_err(&client->dev, "reset-gpios not found\n");
-		return -EIO;
+	priv->reset_gpio =
+		devm_gpiod_get_optional(priv->dev, "reset", GPIOD_OUT_LOW);
+	if (IS_ERR_OR_NULL(priv->reset_gpio)) {
+		ret = PTR_ERR(priv->reset_gpio);
+		if (ret != -EPROBE_DEFER) {
+			dev_warn(&client->dev, "reset-gpios not found: %d\n", ret);
+		}
 	}
 	else {
-		gpio_set_value(priv->reset_gpio, 1);
+		gpiod_set_value_cansleep(priv->reset_gpio, 1);
 		usleep_range(30, 50);
-		gpio_set_value(priv->reset_gpio, 0);
+		gpiod_set_value_cansleep(priv->reset_gpio, 0);
 		usleep_range(30, 50);
 	}
 	msleep(50);

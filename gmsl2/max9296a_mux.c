@@ -42,7 +42,7 @@ struct max9296a_priv {
 	bool i2c_addr_change;
 	unsigned int i2c_addr;
 
-	int reset_gpio;
+	struct gpio_desc *reset_gpio;
 };
 
 struct max9296a_chip_info {
@@ -1619,8 +1619,7 @@ static int max9296a_select_links(struct max_des_priv *des_priv,
 	dev_dbg(priv->dev, "%s()\n", __func__);
 
 	if (!mask) {
-		dev_err(priv->dev, "Disable all links unsupported\n");
-		return -EINVAL;
+		dev_warn(priv->dev, "All links are disabled\n");
 	}
 
 	ret = max9296a_update_bits(priv, 0x10,
@@ -1728,15 +1727,18 @@ static int max9296a_probe(struct i2c_client *client)
 	priv->des_priv.regmap = priv->regmap;
 	priv->des_priv.ops = ops;
 
-	priv->reset_gpio = of_get_named_gpio(dev->of_node, "reset-gpios", 0);
-	if (priv->reset_gpio < 0) {
-		dev_err(&client->dev, "reset-gpios not found\n");
-		return -EIO;
+	priv->reset_gpio =
+		devm_gpiod_get_optional(priv->dev, "reset", GPIOD_OUT_LOW);
+	if (IS_ERR_OR_NULL(priv->reset_gpio)) {
+		ret = PTR_ERR(priv->reset_gpio);
+		if (ret != -EPROBE_DEFER) {
+			dev_warn(&client->dev, "reset-gpios not found: %d\n", ret);
+		}
 	}
 	else {
-		gpio_set_value(priv->reset_gpio, 1);
+		gpiod_set_value_cansleep(priv->reset_gpio, 1);
 		usleep_range(30, 50);
-		gpio_set_value(priv->reset_gpio, 0);
+		gpiod_set_value_cansleep(priv->reset_gpio, 0);
 		usleep_range(30, 50);
 	}
 	msleep(50);
