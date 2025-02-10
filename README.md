@@ -14,6 +14,12 @@
 - [JetPack 6.1](https://developer.nvidia.com/embedded/jetpack-sdk-61) [[L4T 36.4]](https://developer.nvidia.com/embedded/jetson-linux-r3640)
 - [JetPack 6.2](https://developer.nvidia.com/embedded/jetpack-sdk-62) [[L4T 36.4]](https://developer.nvidia.com/embedded/jetson-linux-r3643)
 
+</br>
+
+>**Note**: If You'd like to find other supported JetPack versions, you should switch to the other branches:
+>- [JetPack 4.6.1](https://github.com/TechNexion-Vision/TEV-Jetson_Camera_driver/tree/tn_l4t-r32.7.1_kernel-4.9)
+>- [JetPack 5.1.x](https://github.com/TechNexion-Vision/TEV-Jetson_Camera_driver/tree/tn_l4t-r35.3.1.ga_kernel-5.10)
+
 ## Support Camera Modules
 
 | **Camera Series** | **Products** |
