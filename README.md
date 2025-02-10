@@ -12,6 +12,7 @@
 ## Support JetPack Version
 
 - [JetPack 6.1](https://developer.nvidia.com/embedded/jetpack-sdk-61) [[L4T 36.4]](https://developer.nvidia.com/embedded/jetson-linux-r3640)
+- [JetPack 6.2](https://developer.nvidia.com/embedded/jetpack-sdk-62) [[L4T 36.4]](https://developer.nvidia.com/embedded/jetson-linux-r3643)
 
 ## Support Camera Modules
 
@@ -58,22 +59,28 @@
 We recommend following the [Getting Started Guide](https://developer.nvidia.com/embedded/learn/get-started-jetson-orin-nano-devkit) for Jetson Orin Nano Developer Kit.
 After that, you can follow the below method to install TechNexion Cameras Driver.
 
-1. Download pre-built modules for JetPack6.1.
+1. Download pre-built modules.
 
+JetPack 6.1
 ```
 wget https://download.technexion.com/demo_software/EVK/NVIDIA/OrinNano/pre-built-modules/latest/JP61/tn_camera_modules_jp61.tar.gz
+```
+
+JetPack 6.2
+```
+wget https://download.technexion.com/demo_software/EVK/NVIDIA/OrinNano/pre-built-modules/latest/JP62/tn_camera_modules_jp62.tar.gz
 ```
 
 2. uncompress the modules.
 
 ```shell
-tar -xf tn_camera_modules_jp61.tar.gz
+tar -xf tn_camera_modules_<jp_ver>.tar.gz
 ```
 
 3. Run installation script.
 
 ```shell'
-cd tn_camera_modules/
+cd tn_camera_modules_<release_time>/
 ./tn_install.sh
 ```
 
