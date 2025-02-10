@@ -258,6 +258,8 @@
 #define V4L2_CID_TEVS_BSL_MODE				(V4L2_CID_USER_TEVS_BASE + 0)
 #define V4L2_CID_TEVS_MAX_FPS				(V4L2_CID_USER_TEVS_BASE + 1)
 #define V4L2_CID_TEVS_DENOISE				(V4L2_CID_USER_TEVS_BASE + 2)
+#define V4L2_CID_TEVS_AE_EXP_TIME_UPPER		(V4L2_CID_USER_TEVS_BASE + 3)
+#define V4L2_CID_TEVS_AE_EXP_TIME_MAX		(V4L2_CID_USER_TEVS_BASE + 4)
 
 #define DEFAULT_HEADER_VERSION 3
 #define TEVS_BOOT_TIME						(250)
@@ -331,6 +333,8 @@ struct tevs {
 	struct v4l2_ctrl *bsl;
 	struct v4l2_ctrl *max_fps;
 	struct v4l2_ctrl *denoise;
+	struct v4l2_ctrl *ae_exp_upper;
+	struct v4l2_ctrl *ae_exp_max;
 };
 
 static const struct regmap_config tevs_regmap_config = {
@@ -1221,6 +1225,28 @@ static int tevs_set_denoise(struct tevs *tevs, s32 value)
 	return tevs_i2c_write_16b(tevs, TEVS_DENOISE, value & TEVS_DENOISE_MASK);
 }
 
+static int tevs_set_ae_auto_exp_upper(struct tevs *tevs, s32 value)
+{
+	u8 val[4];
+	__be32 temp;
+
+	temp = cpu_to_be32(value);
+	memcpy(val, &temp, 4);
+
+	return tevs_i2c_write(tevs, TEVS_AE_AUTO_EXP_TIME_UPPER, val, 4);
+}
+
+static int tevs_set_ae_auto_exp_max(struct tevs *tevs, s32 value)
+{
+	u8 val[4];
+	__be32 temp;
+
+	temp = cpu_to_be32(value);
+	memcpy(val, &temp, 4);
+
+	return tevs_i2c_write(tevs, TEVS_AE_AUTO_EXP_TIME_MAX, val, 4);
+}
+
 static int tevs_s_ctrl(struct v4l2_ctrl *ctrl)
 {
 	struct tevs *tevs = _to_tevs_priv(ctrl);
@@ -1288,6 +1314,12 @@ static int tevs_s_ctrl(struct v4l2_ctrl *ctrl)
 
 	case V4L2_CID_TEVS_DENOISE:
 		return tevs_set_denoise(tevs, ctrl->val);
+
+	case V4L2_CID_TEVS_AE_EXP_TIME_UPPER:
+		return tevs_set_ae_auto_exp_upper(tevs, ctrl->val);
+
+	case V4L2_CID_TEVS_AE_EXP_TIME_MAX:
+		return tevs_set_ae_auto_exp_max(tevs, ctrl->val);
 
 	default:
 		dev_dbg(tevs->dev, "Unknown control 0x%x\n", ctrl->id);
@@ -1361,6 +1393,28 @@ static const struct v4l2_ctrl_config tevs_denoise = {
 	.def = 0x2000,
 };
 
+static const struct v4l2_ctrl_config tevs_ae_exp_upper = {
+	.ops = &tevs_ctrl_ops,
+	.id = V4L2_CID_TEVS_AE_EXP_TIME_UPPER,
+	.name = "AE_Exposure_Upper",
+	.type = V4L2_CTRL_TYPE_INTEGER,
+	.min = 0x0000,
+	.max = 0xFFFFFFFFF,
+	.step = 1,
+	.def = 0x411A,
+};
+
+static const struct v4l2_ctrl_config tevs_ae_exp_max = {
+	.ops = &tevs_ctrl_ops,
+	.id = V4L2_CID_TEVS_AE_EXP_TIME_MAX,
+	.name = "AE_Exposure_Max",
+	.type = V4L2_CTRL_TYPE_INTEGER,
+	.min = 0x0000,
+	.max = 0xFFFFFFFFF,
+	.step = 1,
+	.def = 0x1046A,
+};
+
 static int tevs_ctrls_init(struct tevs *tevs)
 {
 	struct tegracam_ctrl_handler *ctrl_hdl;
@@ -1373,7 +1427,7 @@ static int tevs_ctrls_init(struct tevs *tevs)
 
 	if(ctrl_hdl == NULL){
 		dev_info(&tevs->tc_dev->client->dev,"init control handler...\n");
-		ret = v4l2_ctrl_handler_init(&ctrl_hdl->ctrl_handler, 23);
+		ret = v4l2_ctrl_handler_init(&ctrl_hdl->ctrl_handler, 25);
 		if (ret) {
 			dev_err(&tevs->tc_dev->client->dev,"init handler fail\n");
 			return ret;
@@ -1672,6 +1726,31 @@ static int tevs_ctrls_init(struct tevs *tevs)
 	tevs->denoise->default_value = tevs->denoise->cur.val = ctrl_def;
 	tevs->denoise->maximum = ctrl_max;
 	tevs->denoise->minimum = ctrl_min;
+
+	tevs->ae_exp_upper =
+		v4l2_ctrl_new_custom(&ctrl_hdl->ctrl_handler, &tevs_ae_exp_upper, NULL);
+	ret = tevs_i2c_read(tevs, TEVS_AE_AUTO_EXP_TIME_UPPER, exp, 4);
+	ctrl_def = be32_to_cpup((__be32 *)exp) & TEVS_AE_AUTO_EXP_TIME_MASK;
+	ret += tevs_i2c_read(tevs, TEVS_AE_MANUAL_EXP_TIME_MAX, exp, 4);
+	ctrl_max = be32_to_cpup((__be32 *)exp) & TEVS_AE_MANUAL_EXP_TIME_MASK;
+	ret += tevs_i2c_read(tevs, TEVS_AE_MANUAL_EXP_TIME_MIN, exp, 4);
+	ctrl_min = be32_to_cpup((__be32 *)exp) & TEVS_AE_MANUAL_EXP_TIME_MASK;
+	if (ret)
+		goto error;
+	tevs->ae_exp_upper->default_value = tevs->ae_exp_upper->cur.val =
+		ctrl_def;
+	tevs->ae_exp_upper->maximum = ctrl_max;
+	tevs->ae_exp_upper->minimum = ctrl_min;
+
+	tevs->ae_exp_max =
+		v4l2_ctrl_new_custom(&ctrl_hdl->ctrl_handler, &tevs_ae_exp_max, NULL);
+	ret = tevs_i2c_read(tevs, TEVS_AE_AUTO_EXP_TIME_MAX, exp, 4);
+	ctrl_def = be32_to_cpup((__be32 *)exp) & TEVS_AE_AUTO_EXP_TIME_MASK;
+	if (ret)
+		goto error;
+	tevs->ae_exp_max->default_value = tevs->ae_exp_max->cur.val = ctrl_def;
+	tevs->ae_exp_max->maximum = ctrl_max;
+	tevs->ae_exp_max->minimum = ctrl_min;
 
 	if (ctrl_hdl->ctrl_handler.error) {
 		dev_err(&tevs->tc_dev->client->dev, "ctrls error\n");
