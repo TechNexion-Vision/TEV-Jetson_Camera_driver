@@ -99,6 +99,13 @@ struct max_des_phy {
 	bool enabled;
 };
 
+struct max_des_fsync {
+	unsigned int freq;
+	bool internal_output;
+	bool internal;
+	bool external;
+};
+
 struct max_des_ops {
 	unsigned int num_phys;
 	unsigned int num_pipes;
@@ -118,6 +125,7 @@ struct max_des_ops {
 	int (*init_phy)(struct max_des_priv *priv, struct max_des_phy *phy);
 	int (*init_pipe)(struct max_des_priv *priv, struct max_des_pipe *pipe);
 	int (*init_link)(struct max_des_priv *priv, struct max_des_link *link);
+	int (*init_fsync)(struct max_des_priv *priv, struct max_des_fsync *fsync);
 	int (*update_pipe_remaps)(struct max_des_priv *priv, struct max_des_pipe *pipe);
 	int (*select_links)(struct max_des_priv *priv, unsigned int mask);
 	int (*post_init)(struct max_des_priv *priv);
@@ -144,6 +152,7 @@ struct max_des_priv {
 	struct max_des_phy *phys;
 	struct max_des_pipe *pipes;
 	struct max_des_link *links;
+	struct max_des_fsync *fsync;
 	struct max_des_subdev_priv *sd_privs;
 };
 
