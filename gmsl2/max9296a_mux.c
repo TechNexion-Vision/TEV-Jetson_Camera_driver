@@ -14,6 +14,10 @@
 #include <linux/of_device.h>
 #include <linux/of_gpio.h>
 #include <linux/of_graph.h>
+#include <linux/pinctrl/pinctrl.h>
+#include <linux/pinctrl/pinmux.h>
+#include <linux/pinctrl/pinconf.h>
+#include <linux/pinctrl/pinconf-generic.h>
 #include <linux/regmap.h>
 
 #include <media/v4l2-ctrls.h>
@@ -23,6 +27,8 @@
 #include "max_des.h"
 #include "max_ser.h"
 
+#define MAX_DES_PCLK					(25000000ull)
+
 #define MAX_DES_LINK_FREQUENCY_MIN		(100000000ull)
 #define MAX_DES_LINK_FREQUENCY_DEFAULT	(750000000ull)
 #define MAX_DES_LINK_FREQUENCY_MAX		(1250000000ull)
@@ -30,6 +36,8 @@
 #define MAX9296_N_GMSL			(2)
 
 #define MAX9296A_PIPES_NUM		(4)
+#define MAX9296A_NAME			"max9296a"
+#define MAX9296A_GPIO_NUM		(13)
 
 struct max9296a_priv {
 	struct max_des_priv des_priv;
@@ -38,6 +46,10 @@ struct max9296a_priv {
 	struct device *dev;
 	struct i2c_client *client;
 	struct regmap *regmap;
+
+	struct pinctrl_dev *pctldev;
+	struct pinctrl_desc pctldesc;
+	struct gpio_chip gc;
 
 	bool i2c_addr_change;
 	unsigned int i2c_addr;
@@ -318,6 +330,12 @@ static int max_des_init(struct max_des_priv *priv)
 		}
 	}
 
+	if (priv->ops->init_fsync) {
+		ret = priv->ops->init_fsync(priv, priv->fsync);
+		if (ret)
+			return ret;
+	}
+
 	return 0;
 }
 
@@ -382,6 +400,45 @@ static int max_ser_wait_for_multiple(struct i2c_client *client, struct regmap *r
 static int max_ser_wait(struct i2c_client *client, struct regmap *regmap, u8 addr)
 {
 	return max_ser_wait_for_multiple(client, regmap, &addr, 1);
+}
+
+static int max_des_parse_fsync(struct max_des_priv *priv)
+{
+	struct device *dev = &priv->client->dev;
+	char const *fsync_mode;
+	u32 fsync_freq = 0;
+	int ret;
+
+	dev_dbg(priv->dev, "%s()\n", __func__);
+
+	if (of_property_read_string(dev->of_node, "fsync-mode", &fsync_mode)) {
+		return 0;
+	}
+
+	dev_dbg(priv->dev, "mode: %s\n", fsync_mode);
+
+	if (!strcmp("internal", fsync_mode) ||
+		!strcmp("internal-output", fsync_mode)) {
+		ret = of_property_read_u32(dev->of_node, "fsync-freq", &fsync_freq);
+		if (ret) {
+			dev_err(priv->dev, "fsync-freq not found: %d\n", ret);
+			return ret;
+		}
+		priv->fsync->freq = MAX_DES_PCLK / fsync_freq;
+
+		if (!strcmp("internal-output", fsync_mode))
+			priv->fsync->internal_output = true;
+		else
+			priv->fsync->internal = true;
+	}
+	else if (!strcmp("external", fsync_mode)) {
+		priv->fsync->external = true;
+	}
+	else {
+		dev_warn(priv->dev, "unknow fsync-mode");
+	}
+
+	return 0;
 }
 
 static int max_des_init_link_ser_xlate(struct max_des_priv *priv,
@@ -939,6 +996,11 @@ static int max_des_allocate(struct max_des_priv *priv)
 	if (!priv->links)
 		return -ENOMEM;
 
+	priv->fsync = devm_kcalloc(priv->dev, 1,
+				sizeof(*priv->fsync), GFP_KERNEL);
+	if (!priv->fsync)
+		return -ENOMEM;
+
 	return 0;
 }
 
@@ -963,6 +1025,10 @@ static int max_des_probe(struct max_des_priv *priv)
 		return ret;
 
 	ret = max_des_parse_link_ser_xlate(priv);
+	if (ret)
+		return ret;
+
+	ret = max_des_parse_fsync(priv);
 	if (ret)
 		return ret;
 
@@ -1029,6 +1095,16 @@ static int max9296a_update_bits(struct max9296a_priv *priv, unsigned int reg,
 		dev_err(priv->dev, "update 0x%04x failed\n", reg);
 
 	return ret;
+}
+
+static unsigned int max9296a_field_get(unsigned int val, unsigned int mask)
+{
+	return (val & mask) >> __ffs(mask);
+}
+
+static unsigned int max9296a_field_prep(unsigned int val, unsigned int mask)
+{
+	return (val << __ffs(mask)) & mask;
 }
 
 static int max9296a_change_address(struct max9296a_priv *priv)
@@ -1183,6 +1259,11 @@ static int max9296a_init(struct max_des_priv *des_priv)
 
 	/* Set I2C speed to 397Kbps */
 	ret = max9296a_update_bits(priv, 0x41, GENMASK(6, 4), 0x50);
+	if (ret)
+		return ret;
+
+	/* Disable all UART channels */
+	ret = max9296a_update_bits(priv, 0x3, GENMASK(5, 4), 0x00);
 	if (ret)
 		return ret;
 
@@ -1548,6 +1629,32 @@ static int max9296a_init_link(struct max_des_priv *des_priv,
 	return 0;
 }
 
+static int max9296a_init_fsync(struct max_des_priv *des_priv,
+				  struct max_des_fsync *fsync)
+{
+	struct max9296a_priv *priv = des_to_priv(des_priv);
+	int ret = 0;
+
+	dev_dbg(priv->dev, "%s()\n", __func__);
+
+	if (fsync->internal || fsync->internal_output) {
+		ret = max9296a_write(priv, 0x3f1, 0x00);
+		ret += max9296a_write(priv, 0x3e2, 0x00);
+		ret += max9296a_write(priv, 0x3ea, 0x00);
+		ret += max9296a_write(priv, 0x3eb, 0x00);
+		ret += max9296a_write(priv, 0x3e7, (fsync->freq >> 16) & 0xff);
+		ret += max9296a_write(priv, 0x3e6, (fsync->freq >> 8) & 0xff);
+		ret += max9296a_write(priv, 0x3e5, (fsync->freq >> 0) & 0xff);
+		ret += max9296a_write(priv, 0x3ef, 0xc0);
+		ret += max9296a_write(priv, 0x3e0, fsync->internal_output << 2);
+	}
+	else if (fsync->external) {
+		ret = max9296a_write(priv, 0x3e0, fsync->external << 3);
+	}
+
+	return ret;
+}
+
 static int max9296a_init_pipe_remap(struct max9296a_priv *priv,
 					struct max_des_pipe *pipe,
 					struct max_des_dt_vc_remap *remap,
@@ -1687,9 +1794,450 @@ static const struct max_des_ops max9296a_ops = {
 	.init_phy = max9296a_init_phy,
 	.init_pipe = max9296a_init_pipe,
 	.init_link = max9296a_init_link,
+	.init_fsync = max9296a_init_fsync,
 	.update_pipe_remaps = max9296a_update_pipe_remaps,
 	.select_links = max9296a_select_links,
 	.post_init = max9296a_post_init,
+};
+
+#define max9296a_PIN(n) PINCTRL_PIN(n, "mfp" __stringify(n))
+
+static const struct pinctrl_pin_desc max9296a_pins[] = {
+	max9296a_PIN(0), max9296a_PIN(1), max9296a_PIN(2),
+	max9296a_PIN(3), max9296a_PIN(4), max9296a_PIN(5),
+	max9296a_PIN(6), max9296a_PIN(7), max9296a_PIN(8),
+	max9296a_PIN(9), max9296a_PIN(10), max9296a_PIN(11),
+	max9296a_PIN(12),
+};
+
+#define max9296a_GROUP_PINS(name, ...)                                         \
+	static const unsigned int name##_pins[] = { __VA_ARGS__ }
+
+max9296a_GROUP_PINS(mfp0, 0);
+max9296a_GROUP_PINS(mfp1, 1);
+max9296a_GROUP_PINS(mfp2, 2);
+max9296a_GROUP_PINS(mfp3, 3);
+max9296a_GROUP_PINS(mfp4, 4);
+max9296a_GROUP_PINS(mfp5, 5);
+max9296a_GROUP_PINS(mfp6, 6);
+max9296a_GROUP_PINS(mfp7, 7);
+max9296a_GROUP_PINS(mfp8, 8);
+max9296a_GROUP_PINS(mfp9, 9);
+max9296a_GROUP_PINS(mfp10, 10);
+max9296a_GROUP_PINS(mfp11, 11);
+max9296a_GROUP_PINS(mfp12, 12);
+
+#define max9296a_GROUP(name)                                                   \
+	PINCTRL_PINGROUP(__stringify(name), name##_pins,                       \
+			ARRAY_SIZE(name##_pins))
+
+static const struct pingroup max9296a_ctrl_groups[] = {
+	max9296a_GROUP(mfp0), max9296a_GROUP(mfp1), max9296a_GROUP(mfp2),
+	max9296a_GROUP(mfp3), max9296a_GROUP(mfp4), max9296a_GROUP(mfp5),
+	max9296a_GROUP(mfp6), max9296a_GROUP(mfp7), max9296a_GROUP(mfp8),
+	max9296a_GROUP(mfp9), max9296a_GROUP(mfp10), max9296a_GROUP(mfp11),
+	max9296a_GROUP(mfp12),
+};
+
+#define max9296a_FUNC_GROUPS(name, ...)                                        \
+	static const char *const name##_groups[] = { __VA_ARGS__ }
+
+max9296a_FUNC_GROUPS(gpio, "mfp0", "mfp1", "mfp2", "mfp3", "mfp4", "mfp5",
+			"mfp6", "mfp7", "mfp8", "mfp9", "mfp10", "mfp11", "mfp12");
+
+enum max9296a_func {
+	max9296a_func_gpio,
+};
+
+#define max9296a_FUNC(name)                                                    \
+	[max9296a_func_##name] = PINCTRL_PINFUNCTION(                          \
+		__stringify(name), name##_groups, ARRAY_SIZE(name##_groups))
+
+static const struct pinfunction max9296a_functions[] = {
+	max9296a_FUNC(gpio),
+};
+
+enum max9296a_pinctrl_params {
+	max9296a_PINCTRL_PULL_STRENGTH_WEAK = PIN_CONFIG_END + 1,
+	max9296a_PINCTRL_JITTER_COMPENSATION_EN,
+	max9296a_PINCTRL_GMSL_TX_EN,
+	max9296a_PINCTRL_GMSL_RX_EN,
+	max9296a_PINCTRL_GMSL_TX_ID,
+	max9296a_PINCTRL_GMSL_RX_ID,
+	max9296a_PINCTRL_INPUT_VALUE,
+};
+
+static const struct pinconf_generic_params max9296a_cfg_params[] = {
+	{ "maxim,pull-strength-weak", max9296a_PINCTRL_PULL_STRENGTH_WEAK, 0 },
+	{ "maxim,jitter-compensation", max9296a_PINCTRL_JITTER_COMPENSATION_EN, 0 },
+	{ "maxim,gmsl-tx", max9296a_PINCTRL_GMSL_TX_EN, 0 },
+	{ "maxim,gmsl-rx", max9296a_PINCTRL_GMSL_RX_EN, 0 },
+	{ "maxim,gmsl-tx-id", max9296a_PINCTRL_GMSL_TX_ID, 0 },
+	{ "maxim,gmsl-rx-id", max9296a_PINCTRL_GMSL_RX_ID, 0 },
+};
+
+static int max9296a_ctrl_get_groups_count(struct pinctrl_dev *pctldev)
+{
+	return ARRAY_SIZE(max9296a_ctrl_groups);
+}
+
+static const char *max9296a_ctrl_get_group_name(struct pinctrl_dev *pctldev,
+						unsigned selector)
+{
+	return max9296a_ctrl_groups[selector].name;
+}
+
+static int max9296a_ctrl_get_group_pins(struct pinctrl_dev *pctldev,
+					unsigned selector,
+					const unsigned **pins,
+					unsigned *num_pins)
+{
+	*pins = (unsigned *)max9296a_ctrl_groups[selector].pins;
+	*num_pins = max9296a_ctrl_groups[selector].npins;
+
+	return 0;
+}
+
+static int max9296a_get_pin_config_reg(unsigned int offset, u32 param,
+					unsigned int *reg, unsigned int *mask,
+					unsigned int *val)
+{
+	*reg = 0x2b0 + offset * 0x3;
+
+	switch (param) {
+	case PIN_CONFIG_OUTPUT_ENABLE:
+		*mask = BIT(0);
+		*val = 0b0;
+		return 0;
+	case PIN_CONFIG_INPUT_ENABLE:
+		*mask = BIT(0);
+		*val = 0b1;
+		return 0;
+	case max9296a_PINCTRL_GMSL_TX_EN:
+		*mask = BIT(1);
+		*val = 0b1;
+		return 0;
+	case max9296a_PINCTRL_GMSL_RX_EN:
+		*mask = BIT(2);
+		*val = 0b1;
+		return 0;
+	case max9296a_PINCTRL_INPUT_VALUE:
+		*mask = BIT(3);
+		*val = 0b1;
+		return 0;
+	case PIN_CONFIG_OUTPUT:
+		*mask = BIT(4);
+		*val = 0b1;
+		return 0;
+	case max9296a_PINCTRL_JITTER_COMPENSATION_EN:
+		*mask = BIT(5);
+		*val = 0b1;
+		return 0;
+	case max9296a_PINCTRL_PULL_STRENGTH_WEAK:
+		*mask = BIT(7);
+		*val = 0b0;
+		return 0;
+	case max9296a_PINCTRL_GMSL_TX_ID:
+		*reg += 1;
+		*mask = GENMASK(4, 0);
+		return 0;
+	case PIN_CONFIG_DRIVE_OPEN_DRAIN:
+		*reg += 1;
+		*mask = BIT(5);
+		*val = 0b0;
+		return 0;
+	case PIN_CONFIG_DRIVE_PUSH_PULL:
+		*reg += 1;
+		*mask = BIT(5);
+		*val = 0b1;
+		return 0;
+	case PIN_CONFIG_BIAS_DISABLE:
+		*reg += 1;
+		*mask = GENMASK(7, 6);
+		*val = 0b00;
+		return 0;
+	case PIN_CONFIG_BIAS_PULL_DOWN:
+		*reg += 1;
+		*mask = GENMASK(7, 6);
+		*val = 0b10;
+		return 0;
+	case PIN_CONFIG_BIAS_PULL_UP:
+		*reg += 1;
+		*mask = GENMASK(7, 6);
+		*val = 0b01;
+		return 0;
+	case max9296a_PINCTRL_GMSL_RX_ID:
+		*reg += 2;
+		*mask = GENMASK(4, 0);
+		return 0;
+	default:
+		return -ENOTSUPP;
+	}
+}
+
+static int max9296a_conf_pin_config_get(struct pinctrl_dev *pctldev,
+					unsigned int offset,
+					unsigned long *config)
+{
+	struct max9296a_priv *priv = pinctrl_dev_get_drvdata(pctldev);
+	u32 param = pinconf_to_config_param(*config);
+	unsigned int reg, mask, val;
+	int ret;
+
+	dev_dbg(priv->dev, "%s()\n", __func__);
+
+	ret = max9296a_get_pin_config_reg(offset, param, &reg, &mask, &val);
+	if (ret)
+		return ret;
+
+	switch (param) {
+	case PIN_CONFIG_DRIVE_OPEN_DRAIN:
+	case PIN_CONFIG_DRIVE_PUSH_PULL:
+	case PIN_CONFIG_BIAS_DISABLE:
+	case PIN_CONFIG_BIAS_PULL_DOWN:
+	case PIN_CONFIG_BIAS_PULL_UP:
+		ret = max9296a_read(priv, reg);
+		if (ret < 0)
+			return ret;
+
+		val = max9296a_field_get(ret, mask) == val;
+		if (!val)
+			return -EINVAL;
+
+		break;
+	case max9296a_PINCTRL_JITTER_COMPENSATION_EN:
+	case max9296a_PINCTRL_PULL_STRENGTH_WEAK:
+	case max9296a_PINCTRL_GMSL_TX_EN:
+	case max9296a_PINCTRL_GMSL_RX_EN:
+	case max9296a_PINCTRL_INPUT_VALUE:
+	case PIN_CONFIG_OUTPUT_ENABLE:
+	case PIN_CONFIG_INPUT_ENABLE:
+	case PIN_CONFIG_OUTPUT:
+		ret = max9296a_read(priv, reg);
+		if (ret < 0)
+			return ret;
+
+		val = max9296a_field_get(ret, mask) == val;
+		break;
+	case max9296a_PINCTRL_GMSL_TX_ID:
+	case max9296a_PINCTRL_GMSL_RX_ID:
+		ret = max9296a_read(priv, reg);
+		if (ret < 0)
+			return ret;
+
+		val = max9296a_field_get(val, mask);
+		break;
+	default:
+		return -ENOTSUPP;
+	}
+
+	*config = pinconf_to_config_packed(param, val);
+
+	return 0;
+}
+
+static int max9296a_conf_pin_config_set_one(struct max9296a_priv *priv,
+						unsigned int offset,
+						unsigned long config)
+{
+	u32 param = pinconf_to_config_param(config);
+	u32 arg = pinconf_to_config_argument(config);
+	unsigned int reg, mask, val;
+	int ret;
+
+	dev_dbg(priv->dev, "%s()\n", __func__);
+
+	ret = max9296a_get_pin_config_reg(offset, param, &reg, &mask, &val);
+	if (ret)
+		return ret;
+
+	switch (param) {
+	case PIN_CONFIG_DRIVE_OPEN_DRAIN:
+	case PIN_CONFIG_DRIVE_PUSH_PULL:
+	case PIN_CONFIG_BIAS_DISABLE:
+	case PIN_CONFIG_BIAS_PULL_DOWN:
+	case PIN_CONFIG_BIAS_PULL_UP:
+		val = max9296a_field_prep(val, mask);
+
+		ret = max9296a_update_bits(priv, reg, mask, val);
+		break;
+	case max9296a_PINCTRL_JITTER_COMPENSATION_EN:
+	case max9296a_PINCTRL_PULL_STRENGTH_WEAK:
+	case max9296a_PINCTRL_GMSL_TX_EN:
+	case max9296a_PINCTRL_GMSL_RX_EN:
+	case PIN_CONFIG_OUTPUT_ENABLE:
+	case PIN_CONFIG_INPUT_ENABLE:
+	case PIN_CONFIG_OUTPUT:
+		val = max9296a_field_prep(arg ? val : ~val, mask);
+
+		ret = max9296a_update_bits(priv, reg, mask, val);
+		break;
+	case max9296a_PINCTRL_GMSL_TX_ID:
+	case max9296a_PINCTRL_GMSL_RX_ID:
+		val = max9296a_field_prep(arg, mask);
+
+		ret = max9296a_update_bits(priv, reg, mask, val);
+		break;
+	default:
+		return -ENOTSUPP;
+	}
+
+	if (param == PIN_CONFIG_OUTPUT) {
+		config = pinconf_to_config_packed(PIN_CONFIG_OUTPUT_ENABLE, 1);
+		ret = max9296a_conf_pin_config_set_one(priv, offset, config);
+		if (ret)
+			return ret;
+	}
+
+	return ret;
+}
+
+static int max9296a_conf_pin_config_set(struct pinctrl_dev *pctldev,
+					unsigned int offset,
+					unsigned long *configs,
+					unsigned int num_configs)
+{
+	struct max9296a_priv *priv = pinctrl_dev_get_drvdata(pctldev);
+	int ret;
+
+	dev_dbg(priv->dev, "%s()\n", __func__);
+
+	while (num_configs--) {
+		unsigned long config = *configs;
+
+		ret = max9296a_conf_pin_config_set_one(priv, offset, config);
+		if (ret)
+			return ret;
+
+		configs++;
+	}
+
+	return 0;
+}
+
+static int max9296a_mux_get_functions_count(struct pinctrl_dev *pctldev)
+{
+	return ARRAY_SIZE(max9296a_functions);
+}
+
+static const char *max9296a_mux_get_function_name(struct pinctrl_dev *pctldev,
+						unsigned selector)
+{
+	return max9296a_functions[selector].name;
+}
+
+static int max9296a_mux_get_groups(struct pinctrl_dev *pctldev,
+				unsigned selector,
+				const char *const **groups,
+				unsigned *const num_groups)
+{
+	*groups = max9296a_functions[selector].groups;
+	*num_groups = max9296a_functions[selector].ngroups;
+
+	return 0;
+}
+
+static int max9296a_mux_set(struct pinctrl_dev *pctldev, unsigned selector,
+				unsigned group)
+{
+	return 0;
+}
+
+static int max9296a_gpio_get_direction(struct gpio_chip *gc,
+					unsigned int offset)
+{
+	unsigned long config =
+		pinconf_to_config_packed(PIN_CONFIG_OUTPUT_ENABLE, 0);
+	struct max9296a_priv *priv = gpiochip_get_data(gc);
+	int ret;
+
+	dev_dbg(priv->dev, "%s()\n", __func__);
+
+	ret = max9296a_conf_pin_config_get(priv->pctldev, offset, &config);
+	if (ret)
+		return ret;
+
+	return pinconf_to_config_argument(config) ? GPIO_LINE_DIRECTION_OUT :
+							GPIO_LINE_DIRECTION_IN;
+}
+
+static int max9296a_gpio_direction_input(struct gpio_chip *gc,
+					unsigned int offset)
+{
+	unsigned long config =
+		pinconf_to_config_packed(PIN_CONFIG_INPUT_ENABLE, 1);
+	struct max9296a_priv *priv = gpiochip_get_data(gc);
+
+	dev_dbg(priv->dev, "%s()\n", __func__);
+
+	return max9296a_conf_pin_config_set_one(priv, offset, config);
+}
+
+static int max9296a_gpio_direction_output(struct gpio_chip *gc,
+					unsigned int offset, int value)
+{
+	unsigned long config =
+		pinconf_to_config_packed(PIN_CONFIG_OUTPUT, value);
+	struct max9296a_priv *priv = gpiochip_get_data(gc);
+
+	dev_dbg(priv->dev, "%s()\n", __func__);
+
+	return max9296a_conf_pin_config_set_one(priv, offset, config);
+}
+
+static int max9296a_gpio_get(struct gpio_chip *gc, unsigned int offset)
+{
+	unsigned long config =
+		pinconf_to_config_packed(max9296a_PINCTRL_INPUT_VALUE, 0);
+	struct max9296a_priv *priv = gpiochip_get_data(gc);
+	int ret;
+
+	dev_dbg(priv->dev, "%s()\n", __func__);
+
+	ret = max9296a_conf_pin_config_get(priv->pctldev, offset, &config);
+	if (ret)
+		return ret;
+
+	return pinconf_to_config_argument(config);
+}
+
+static void max9296a_gpio_set(struct gpio_chip *gc, unsigned int offset,
+				int value)
+{
+	unsigned long config =
+		pinconf_to_config_packed(PIN_CONFIG_OUTPUT, value);
+	struct max9296a_priv *priv = gpiochip_get_data(gc);
+	int ret;
+
+	dev_dbg(priv->dev, "%s()\n", __func__);
+
+	ret = max9296a_conf_pin_config_set_one(priv, offset, config);
+	if (ret)
+		dev_err(priv->dev,
+			"Failed to set GPIO %u output value, err: %d\n", offset,
+			ret);
+}
+
+static struct pinctrl_ops max9296a_ctrl_ops = {
+	.get_groups_count = max9296a_ctrl_get_groups_count,
+	.get_group_name = max9296a_ctrl_get_group_name,
+	.get_group_pins = max9296a_ctrl_get_group_pins,
+	.dt_node_to_map = pinconf_generic_dt_node_to_map_pin,
+	.dt_free_map = pinconf_generic_dt_free_map,
+};
+
+static const struct pinconf_ops max9296a_conf_ops = {
+	.pin_config_get = max9296a_conf_pin_config_get,
+	.pin_config_set = max9296a_conf_pin_config_set,
+	.is_generic = true,
+};
+
+static const struct pinmux_ops max9296a_mux_ops = {
+	.get_functions_count = max9296a_mux_get_functions_count,
+	.get_function_name = max9296a_mux_get_function_name,
+	.get_function_groups = max9296a_mux_get_groups,
+	.set_mux = max9296a_mux_set,
+	.strict = true,
 };
 
 static int max9296a_probe(struct i2c_client *client)
@@ -1746,9 +2294,9 @@ static int max9296a_probe(struct i2c_client *client)
 		}
 	}
 	else {
-		gpiod_set_value_cansleep(priv->reset_gpio, 1);
-		usleep_range(30, 50);
 		gpiod_set_value_cansleep(priv->reset_gpio, 0);
+		usleep_range(30, 50);
+		gpiod_set_value_cansleep(priv->reset_gpio, 1);
 		usleep_range(30, 50);
 	}
 	msleep(50);
@@ -1773,6 +2321,48 @@ static int max9296a_probe(struct i2c_client *client)
 	if (ret)
 		return ret;
 	msleep(100);
+
+	priv->pctldesc = (struct pinctrl_desc){
+		.owner = THIS_MODULE,
+		.name = MAX9296A_NAME,
+		.pins = max9296a_pins,
+		.npins = ARRAY_SIZE(max9296a_pins),
+		.pctlops = &max9296a_ctrl_ops,
+		.confops = &max9296a_conf_ops,
+		.pmxops = &max9296a_mux_ops,
+		.custom_params = max9296a_cfg_params,
+		.num_custom_params = ARRAY_SIZE(max9296a_cfg_params),
+	};
+
+	ret = devm_pinctrl_register_and_init(dev, &priv->pctldesc, priv,
+						&priv->pctldev);
+	if (ret)
+		return ret;
+
+	ret = pinctrl_enable(priv->pctldev);
+	if (ret)
+		return ret;
+
+	priv->gc = (struct gpio_chip){
+		.owner = THIS_MODULE,
+		.label = MAX9296A_NAME,
+		.base = -1,
+		.ngpio = MAX9296A_GPIO_NUM,
+		.parent = dev,
+		.can_sleep = true,
+		.request = gpiochip_generic_request,
+		.free = gpiochip_generic_free,
+		.set_config = gpiochip_generic_config,
+		.get_direction = max9296a_gpio_get_direction,
+		.direction_input = max9296a_gpio_direction_input,
+		.direction_output = max9296a_gpio_direction_output,
+		.get = max9296a_gpio_get,
+		.set = max9296a_gpio_set,
+	};
+
+	ret = devm_gpiochip_add_data(dev, &priv->gc, priv);
+	if (ret)
+		return ret;
 
 	return max_des_probe(&priv->des_priv);
 }
