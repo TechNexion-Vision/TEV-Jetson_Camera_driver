@@ -31,14 +31,15 @@
 
 struct max96717_priv {
 	struct max_ser_priv ser_priv;
-	struct pinctrl_desc pctldesc;
-	struct gpio_chip gc;
 	const struct max96717_chip_info *info;
 
 	struct device *dev;
 	struct i2c_client *client;
 	struct regmap *regmap;
+
 	struct pinctrl_dev *pctldev;
+	struct pinctrl_desc pctldesc;
+	struct gpio_chip gc;
 };
 
 struct max96717_chip_info {
@@ -740,499 +741,6 @@ static int max96717_wait_for_device(struct max96717_priv *priv)
 	return ret;
 }
 
-#define MAX96717_PIN(n) \
-	PINCTRL_PIN(n, "mfp" __stringify(n))
-
-static const struct pinctrl_pin_desc max96717_pins[] = {
-	MAX96717_PIN(0),
-	MAX96717_PIN(1),
-	MAX96717_PIN(2),
-	MAX96717_PIN(3),
-	MAX96717_PIN(4),
-	MAX96717_PIN(5),
-	MAX96717_PIN(6),
-	MAX96717_PIN(7),
-	MAX96717_PIN(8),
-	MAX96717_PIN(9),
-	MAX96717_PIN(10),
-};
-
-#define MAX96717_GROUP_PINS(name, ...) \
-	static const unsigned int name ## _pins[] = { __VA_ARGS__ }
-
-MAX96717_GROUP_PINS(mfp0, 0);
-MAX96717_GROUP_PINS(mfp1, 1);
-MAX96717_GROUP_PINS(mfp2, 2);
-MAX96717_GROUP_PINS(mfp3, 3);
-MAX96717_GROUP_PINS(mfp4, 4);
-MAX96717_GROUP_PINS(mfp5, 5);
-MAX96717_GROUP_PINS(mfp6, 6);
-MAX96717_GROUP_PINS(mfp7, 7);
-MAX96717_GROUP_PINS(mfp8, 8);
-MAX96717_GROUP_PINS(mfp9, 9);
-MAX96717_GROUP_PINS(mfp10, 10);
-
-#define MAX96717_GROUP(name) \
-	PINCTRL_PINGROUP(__stringify(name), name ## _pins, ARRAY_SIZE(name ## _pins))
-
-static const struct pingroup max96717_ctrl_groups[] = {
-	MAX96717_GROUP(mfp0),
-	MAX96717_GROUP(mfp1),
-	MAX96717_GROUP(mfp2),
-	MAX96717_GROUP(mfp3),
-	MAX96717_GROUP(mfp4),
-	MAX96717_GROUP(mfp5),
-	MAX96717_GROUP(mfp6),
-	MAX96717_GROUP(mfp7),
-	MAX96717_GROUP(mfp8),
-	MAX96717_GROUP(mfp9),
-	MAX96717_GROUP(mfp10),
-};
-
-#define MAX96717_FUNC_GROUPS(name, ...) \
-	static const char * const name ## _groups[] = { __VA_ARGS__ }
-
-MAX96717_FUNC_GROUPS(gpio, "mfp0", "mfp1", "mfp2", "mfp3", "mfp4", "mfp5",
-			"mfp6", "mfp7", "mfp8", "mfp9", "mfp10");
-MAX96717_FUNC_GROUPS(pclk, "mfp0", "mfp1", "mfp2", "mfp3", "mfp4", "mfp7", "mfp8");
-MAX96717_FUNC_GROUPS(rclkout, "mfp4", "mfp2");
-
-enum max96717_func {
-	max96717_func_gpio,
-	max96717_func_pclk,
-	max96717_func_rclkout,
-};
-
-#define MAX96717_FUNC(name)						\
-	[max96717_func_ ## name] =					\
-		PINCTRL_PINFUNCTION(__stringify(name), name ## _groups,	\
-					ARRAY_SIZE(name ## _groups))
-
-static const struct pinfunction max96717_functions[] = {
-	MAX96717_FUNC(gpio),
-	MAX96717_FUNC(pclk),
-	MAX96717_FUNC(rclkout),
-};
-
-enum max96717_pinctrl_params {
-	MAX96717_PINCTRL_PULL_STRENGTH_WEAK = PIN_CONFIG_END + 1,
-	MAX96717_PINCTRL_JITTER_COMPENSATION_EN,
-	MAX96717_PINCTRL_GMSL_TX_EN,
-	MAX96717_PINCTRL_GMSL_RX_EN,
-	MAX96717_PINCTRL_GMSL_TX_ID,
-	MAX96717_PINCTRL_GMSL_RX_ID,
-	MAX96717_PINCTRL_RCLKOUT_CLK,
-	MAX96717_PINCTRL_INPUT_VALUE,
-};
-
-static const struct pinconf_generic_params max96717_cfg_params[] = {
-	{ "maxim,pull-strength-weak", MAX96717_PINCTRL_PULL_STRENGTH_WEAK, 0 },
-	{ "maxim,jitter-compensation", MAX96717_PINCTRL_JITTER_COMPENSATION_EN, 0 },
-	{ "maxim,gmsl-tx", MAX96717_PINCTRL_GMSL_TX_EN, 0 },
-	{ "maxim,gmsl-rx", MAX96717_PINCTRL_GMSL_RX_EN, 0 },
-	{ "maxim,gmsl-tx-id", MAX96717_PINCTRL_GMSL_TX_ID, 0 },
-	{ "maxim,gmsl-rx-id", MAX96717_PINCTRL_GMSL_RX_ID, 0 },
-	{ "maxim,rclkout-clock", MAX96717_PINCTRL_RCLKOUT_CLK, 0 },
-};
-
-static int max96717_ctrl_get_groups_count(struct pinctrl_dev *pctldev)
-{
-	return ARRAY_SIZE(max96717_ctrl_groups);
-}
-
-static const char *max96717_ctrl_get_group_name(struct pinctrl_dev *pctldev,
-						unsigned selector)
-{
-	return max96717_ctrl_groups[selector].name;
-}
-
-static int max96717_ctrl_get_group_pins(struct pinctrl_dev *pctldev, unsigned selector,
-					const unsigned **pins, unsigned *num_pins)
-{
-	*pins = (unsigned *) max96717_ctrl_groups[selector].pins;
-	*num_pins = max96717_ctrl_groups[selector].npins;
-
-	return 0;
-}
-
-static int max96717_get_pin_config_reg(unsigned int offset, u32 param,
-					unsigned int *reg, unsigned int *mask,
-					unsigned int *val)
-{
-	*reg = 0x2be + offset * 0x3;
-
-	switch (param) {
-	case PIN_CONFIG_OUTPUT_ENABLE:
-		*mask = BIT(0);
-		*val = 0b0;
-		return 0;
-	case PIN_CONFIG_INPUT_ENABLE:
-		*mask = BIT(0);
-		*val = 0b1;
-		return 0;
-	case MAX96717_PINCTRL_GMSL_TX_EN:
-		*mask = BIT(1);
-		*val = 0b1;
-		return 0;
-	case MAX96717_PINCTRL_GMSL_RX_EN:
-		*mask = BIT(2);
-		*val = 0b1;
-		return 0;
-	case MAX96717_PINCTRL_INPUT_VALUE:
-		*mask = BIT(3);
-		*val = 0b1;
-		return 0;
-	case PIN_CONFIG_OUTPUT:
-		*mask = BIT(4);
-		*val = 0b1;
-		return 0;
-	case MAX96717_PINCTRL_JITTER_COMPENSATION_EN:
-		*mask = BIT(5);
-		*val = 0b1;
-		return 0;
-	case MAX96717_PINCTRL_PULL_STRENGTH_WEAK:
-		*mask = BIT(7);
-		*val = 0b0;
-		return 0;
-	case MAX96717_PINCTRL_GMSL_TX_ID:
-		*reg += 1;
-		*mask = GENMASK(4, 0);
-		return 0;
-	case PIN_CONFIG_DRIVE_OPEN_DRAIN:
-		*reg += 1;
-		*mask = BIT(5);
-		*val = 0b0;
-		return 0;
-	case PIN_CONFIG_DRIVE_PUSH_PULL:
-		*reg += 1;
-		*mask = BIT(5);
-		*val = 0b1;
-		return 0;
-	case PIN_CONFIG_BIAS_DISABLE:
-		*reg += 1;
-		*mask = GENMASK(7, 6);
-		*val = 0b00;
-		return 0;
-	case PIN_CONFIG_BIAS_PULL_DOWN:
-		*reg += 1;
-		*mask = GENMASK(7, 6);
-		*val = 0b10;
-		return 0;
-	case PIN_CONFIG_BIAS_PULL_UP:
-		*reg += 1;
-		*mask = GENMASK(7, 6);
-		*val = 0b01;
-		return 0;
-	case PIN_CONFIG_SLEW_RATE:
-		*reg = 0x56f;
-
-		if (offset <= 2) {
-			*mask = GENMASK(1, 0) << (offset - 0) * 2;
-		} else if (offset <= 4) {
-			*reg += 1;
-			*mask = GENMASK(3, 2) << (offset - 3) * 2;
-		} else if (offset <= 6) {
-			return -EINVAL;
-		} else if (offset <= 8) {
-			*reg += 2;
-			*mask = GENMASK(5, 4) << (offset - 7) * 2;
-		} else {
-			return -EINVAL;
-		}
-		return 0;
-	case MAX96717_PINCTRL_GMSL_RX_ID:
-		*reg += 2;
-		*mask = GENMASK(4, 0);
-		return 0;
-	case MAX96717_PINCTRL_RCLKOUT_CLK:
-		*reg = 0x3;
-		*mask = GENMASK(1, 0);
-		return 0;
-	default:
-		return -ENOTSUPP;
-	}
-}
-
-static int max96717_conf_pin_config_get(struct pinctrl_dev *pctldev,
-					unsigned int offset,
-					unsigned long *config)
-{
-	struct max96717_priv *priv = pinctrl_dev_get_drvdata(pctldev);
-	u32 param = pinconf_to_config_param(*config);
-	unsigned int reg, mask, val;
-	int ret;
-
-	dev_dbg(priv->dev, "%s()\n", __func__);
-
-	ret = max96717_get_pin_config_reg(offset, param, &reg, &mask, &val);
-	if (ret)
-		return ret;
-
-	switch (param) {
-	case PIN_CONFIG_DRIVE_OPEN_DRAIN:
-	case PIN_CONFIG_DRIVE_PUSH_PULL:
-	case PIN_CONFIG_BIAS_DISABLE:
-	case PIN_CONFIG_BIAS_PULL_DOWN:
-	case PIN_CONFIG_BIAS_PULL_UP:
-		ret = max96717_read(priv, reg);
-		if (ret < 0)
-			return ret;
-
-		val = max96717_field_get(ret, mask) == val;
-		if (!val)
-			return -EINVAL;
-
-		break;
-	case MAX96717_PINCTRL_JITTER_COMPENSATION_EN:
-	case MAX96717_PINCTRL_PULL_STRENGTH_WEAK:
-	case MAX96717_PINCTRL_GMSL_TX_EN:
-	case MAX96717_PINCTRL_GMSL_RX_EN:
-	case MAX96717_PINCTRL_INPUT_VALUE:
-	case PIN_CONFIG_OUTPUT_ENABLE:
-	case PIN_CONFIG_INPUT_ENABLE:
-	case PIN_CONFIG_OUTPUT:
-		ret = max96717_read(priv, reg);
-		if (ret < 0)
-			return ret;
-
-		val = max96717_field_get(ret, mask) == val;
-		break;
-	case MAX96717_PINCTRL_GMSL_TX_ID:
-	case MAX96717_PINCTRL_GMSL_RX_ID:
-	case PIN_CONFIG_SLEW_RATE:
-	case MAX96717_PINCTRL_RCLKOUT_CLK:
-		ret = max96717_read(priv, reg);
-		if (ret < 0)
-			return ret;
-
-		val = max96717_field_get(val, mask);
-		break;
-	default:
-		return -ENOTSUPP;
-	}
-
-	*config = pinconf_to_config_packed(param, val);
-
-	return 0;
-}
-
-static int max96717_conf_pin_config_set_one(struct max96717_priv *priv,
-						unsigned int offset,
-						unsigned long config)
-{
-	u32 param = pinconf_to_config_param(config);
-	u32 arg = pinconf_to_config_argument(config);
-	unsigned int reg, mask, val;
-	int ret;
-
-	ret = max96717_get_pin_config_reg(offset, param, &reg, &mask, &val);
-	if (ret)
-		return ret;
-
-	switch (param) {
-	case PIN_CONFIG_DRIVE_OPEN_DRAIN:
-	case PIN_CONFIG_DRIVE_PUSH_PULL:
-	case PIN_CONFIG_BIAS_DISABLE:
-	case PIN_CONFIG_BIAS_PULL_DOWN:
-	case PIN_CONFIG_BIAS_PULL_UP:
-		val = max96717_field_prep(val, mask);
-
-		ret = max96717_update_bits(priv, reg, mask, val);
-		break;
-	case MAX96717_PINCTRL_JITTER_COMPENSATION_EN:
-	case MAX96717_PINCTRL_PULL_STRENGTH_WEAK:
-	case MAX96717_PINCTRL_GMSL_TX_EN:
-	case MAX96717_PINCTRL_GMSL_RX_EN:
-	case PIN_CONFIG_OUTPUT_ENABLE:
-	case PIN_CONFIG_INPUT_ENABLE:
-	case PIN_CONFIG_OUTPUT:
-		val = max96717_field_prep(arg ? val : ~val, mask);
-
-		ret = max96717_update_bits(priv, reg, mask, val);
-		break;
-	case MAX96717_PINCTRL_GMSL_TX_ID:
-	case MAX96717_PINCTRL_GMSL_RX_ID:
-	case PIN_CONFIG_SLEW_RATE:
-	case MAX96717_PINCTRL_RCLKOUT_CLK:
-		val = max96717_field_prep(arg, mask);
-
-		ret = max96717_update_bits(priv, reg, mask, val);
-		break;
-	default:
-		return -ENOTSUPP;
-	}
-
-	if (ret)
-		return ret;
-
-	switch (param) {
-	case PIN_CONFIG_OUTPUT:
-		config = pinconf_to_config_packed(PIN_CONFIG_OUTPUT_ENABLE, 1);
-		return max96717_conf_pin_config_set_one(priv, offset, config);
-		break;
-	case PIN_CONFIG_OUTPUT_ENABLE:
-		config = pinconf_to_config_packed(MAX96717_PINCTRL_GMSL_RX_EN, 0);
-		return max96717_conf_pin_config_set_one(priv, offset, config);
-	default:
-		break;
-	}
-
-	return 0;
-}
-
-static int max96717_conf_pin_config_set(struct pinctrl_dev *pctldev,
-					unsigned int offset,
-					unsigned long *configs,
-					unsigned int num_configs)
-{
-	struct max96717_priv *priv = pinctrl_dev_get_drvdata(pctldev);
-	int ret;
-
-	while (num_configs--) {
-		unsigned long config = *configs;
-
-		ret = max96717_conf_pin_config_set_one(priv, offset, config);
-		if (ret)
-			return ret;
-
-		configs++;
-	}
-
-	return 0;
-}
-
-static int max96717_mux_get_functions_count(struct pinctrl_dev *pctldev)
-{
-	return ARRAY_SIZE(max96717_functions);
-}
-
-static const char *max96717_mux_get_function_name(struct pinctrl_dev *pctldev,
-						unsigned selector)
-{
-	return max96717_functions[selector].name;
-}
-
-static int max96717_mux_get_groups(struct pinctrl_dev *pctldev,
-				unsigned selector,
-				const char * const **groups,
-				unsigned * const num_groups)
-{
-	*groups = max96717_functions[selector].groups;
-	*num_groups = max96717_functions[selector].ngroups;
-
-	return 0;
-}
-
-static int max96717_mux_set_pclk(struct max96717_priv *priv, unsigned int group)
-{
-	int ret;
-
-	ret = max96717_update_bits(priv, 0x3f1, BIT(0), BIT(0));
-	if (ret)
-		return ret;
-
-	ret = max96717_update_bits(priv, 0x3f1, GENMASK(5, 1),
-				FIELD_PREP(GENMASK(5, 1), group));
-	if (ret)
-		return ret;
-
-	return 0;
-}
-
-static int max96717_mux_set_rclkout(struct max96717_priv *priv, unsigned int group)
-{
-	int ret;
-
-	/* Enable RCLK. */
-	ret = max96717_update_bits(priv, 0x6, BIT(5), BIT(5));
-	if (ret)
-		return ret;
-
-	/* Enable RCLK output on PCLK. */
-	ret = max96717_update_bits(priv, 0x3f1, BIT(7), BIT(7));
-	if (ret)
-		return ret;
-
-	return 0;
-}
-
-static int max96717_mux_set(struct pinctrl_dev *pctldev, unsigned selector,
-				unsigned group)
-{
-	struct max96717_priv *priv = pinctrl_dev_get_drvdata(pctldev);
-	int ret;
-
-	switch (selector) {
-	case max96717_func_pclk:
-		return max96717_mux_set_pclk(priv, group);
-	case max96717_func_rclkout:
-		ret = max96717_mux_set_pclk(priv, group);
-		if (ret)
-			return ret;
-
-		return max96717_mux_set_rclkout(priv, group);
-	}
-
-	return 0;
-}
-static int max96717_gpio_get_direction(struct gpio_chip *gc, unsigned int offset)
-{
-	unsigned long config = pinconf_to_config_packed(PIN_CONFIG_OUTPUT_ENABLE, 0);
-	struct max96717_priv *priv = gpiochip_get_data(gc);
-	int ret;
-
-	dev_dbg(priv->dev, "%s()\n", __func__);
-
-	ret = max96717_conf_pin_config_get(priv->pctldev, offset, &config);
-	if (ret)
-		return ret;
-
-	return pinconf_to_config_argument(config) ? GPIO_LINE_DIRECTION_OUT
-						: GPIO_LINE_DIRECTION_IN;
-}
-
-static int max96717_gpio_direction_input(struct gpio_chip *gc, unsigned int offset)
-{
-	unsigned long config = pinconf_to_config_packed(PIN_CONFIG_INPUT_ENABLE, 1);
-	struct max96717_priv *priv = gpiochip_get_data(gc);
-
-	return max96717_conf_pin_config_set_one(priv, offset, config);
-}
-
-static int max96717_gpio_direction_output(struct gpio_chip *gc, unsigned int offset,
-					int value)
-{
-	unsigned long config = pinconf_to_config_packed(PIN_CONFIG_OUTPUT, value);
-	struct max96717_priv *priv = gpiochip_get_data(gc);
-
-	return max96717_conf_pin_config_set_one(priv, offset, config);
-}
-
-static int max96717_gpio_get(struct gpio_chip *gc, unsigned int offset)
-{
-	unsigned long config = pinconf_to_config_packed(MAX96717_PINCTRL_INPUT_VALUE, 0);
-	struct max96717_priv *priv = gpiochip_get_data(gc);
-	int ret;
-
-	ret = max96717_conf_pin_config_get(priv->pctldev, offset, &config);
-	if (ret)
-		return ret;
-
-	return pinconf_to_config_argument(config);
-}
-
-static void max96717_gpio_set(struct gpio_chip *gc, unsigned int offset, int value)
-{
-	unsigned long config = pinconf_to_config_packed(PIN_CONFIG_OUTPUT, value);
-	struct max96717_priv *priv = gpiochip_get_data(gc);
-	int ret;
-
-	ret = max96717_conf_pin_config_set_one(priv, offset, config);
-	if (ret)
-		dev_err(priv->dev, "Failed to set GPIO %u output value, err: %d\n",
-			offset, ret);
-}
-
 static unsigned int max96717_pipe_id(struct max96717_priv *priv,
 					struct max_ser_pipe *pipe)
 {
@@ -1319,8 +827,6 @@ static int max96717_set_pipe_enable(struct max_ser_priv *ser_priv,
 
 	dev_dbg(priv->dev, "%s() - %d\n", __func__, enable);
 
-	max96717_update_bits(priv, 0x330, 0x08, 0x08);
-	max96717_update_bits(priv, 0x330, 0x08, 0x00);
 	return max96717_update_bits(priv, 0x2, mask, enable ? mask : 0);
 }
 
@@ -1784,7 +1290,525 @@ static int max96717_post_init(struct max_ser_priv *ser_priv)
 			return -EINVAL;
 	}
 
+	max96717_update_bits(priv, 0x330, 0x08, 0x08);
+	max96717_update_bits(priv, 0x330, 0x08, 0x00);
+
 	return 0;
+}
+
+static const struct max_ser_ops max96717_ops = {
+	.num_i2c_xlates = 2,
+	.log_status = max96717_log_status,
+	.log_pipe_status = max96717_log_pipe_status,
+	.log_phy_status = max96717_log_phy_status,
+	.set_pipe_enable = max96717_set_pipe_enable,
+	.update_pipe_dts = max96717_update_pipe_dts,
+	.update_pipe_vcs = max96717_update_pipe_vcs,
+	.init = max96717_init,
+	.init_i2c_xlate = max96717_init_i2c_xlate,
+	.init_phy = max96717_init_phy,
+	.init_pipe = max96717_init_pipe,
+	.post_init = max96717_post_init,
+};
+
+#define MAX96717_PIN(n) \
+	PINCTRL_PIN(n, "mfp" __stringify(n))
+
+static const struct pinctrl_pin_desc max96717_pins[] = {
+	MAX96717_PIN(0),
+	MAX96717_PIN(1),
+	MAX96717_PIN(2),
+	MAX96717_PIN(3),
+	MAX96717_PIN(4),
+	MAX96717_PIN(5),
+	MAX96717_PIN(6),
+	MAX96717_PIN(7),
+	MAX96717_PIN(8),
+	MAX96717_PIN(9),
+	MAX96717_PIN(10),
+};
+
+#define MAX96717_GROUP_PINS(name, ...) \
+	static const unsigned int name ## _pins[] = { __VA_ARGS__ }
+
+MAX96717_GROUP_PINS(mfp0, 0);
+MAX96717_GROUP_PINS(mfp1, 1);
+MAX96717_GROUP_PINS(mfp2, 2);
+MAX96717_GROUP_PINS(mfp3, 3);
+MAX96717_GROUP_PINS(mfp4, 4);
+MAX96717_GROUP_PINS(mfp5, 5);
+MAX96717_GROUP_PINS(mfp6, 6);
+MAX96717_GROUP_PINS(mfp7, 7);
+MAX96717_GROUP_PINS(mfp8, 8);
+MAX96717_GROUP_PINS(mfp9, 9);
+MAX96717_GROUP_PINS(mfp10, 10);
+
+#define MAX96717_GROUP(name) \
+	PINCTRL_PINGROUP(__stringify(name), name ## _pins, ARRAY_SIZE(name ## _pins))
+
+static const struct pingroup max96717_ctrl_groups[] = {
+	MAX96717_GROUP(mfp0),
+	MAX96717_GROUP(mfp1),
+	MAX96717_GROUP(mfp2),
+	MAX96717_GROUP(mfp3),
+	MAX96717_GROUP(mfp4),
+	MAX96717_GROUP(mfp5),
+	MAX96717_GROUP(mfp6),
+	MAX96717_GROUP(mfp7),
+	MAX96717_GROUP(mfp8),
+	MAX96717_GROUP(mfp9),
+	MAX96717_GROUP(mfp10),
+};
+
+#define MAX96717_FUNC_GROUPS(name, ...) \
+	static const char * const name ## _groups[] = { __VA_ARGS__ }
+
+MAX96717_FUNC_GROUPS(gpio, "mfp0", "mfp1", "mfp2", "mfp3", "mfp4", "mfp5",
+			"mfp6", "mfp7", "mfp8", "mfp9", "mfp10");
+MAX96717_FUNC_GROUPS(pclk, "mfp0", "mfp1", "mfp2", "mfp3", "mfp4", "mfp7", "mfp8");
+MAX96717_FUNC_GROUPS(rclkout, "mfp4", "mfp2");
+
+enum max96717_func {
+	max96717_func_gpio,
+	max96717_func_pclk,
+	max96717_func_rclkout,
+};
+
+#define MAX96717_FUNC(name)						\
+	[max96717_func_ ## name] =					\
+		PINCTRL_PINFUNCTION(__stringify(name), name ## _groups,	\
+					ARRAY_SIZE(name ## _groups))
+
+static const struct pinfunction max96717_functions[] = {
+	MAX96717_FUNC(gpio),
+	MAX96717_FUNC(pclk),
+	MAX96717_FUNC(rclkout),
+};
+
+enum max96717_pinctrl_params {
+	MAX96717_PINCTRL_PULL_STRENGTH_WEAK = PIN_CONFIG_END + 1,
+	MAX96717_PINCTRL_JITTER_COMPENSATION_EN,
+	MAX96717_PINCTRL_GMSL_TX_EN,
+	MAX96717_PINCTRL_GMSL_RX_EN,
+	MAX96717_PINCTRL_GMSL_TX_ID,
+	MAX96717_PINCTRL_GMSL_RX_ID,
+	MAX96717_PINCTRL_RCLKOUT_CLK,
+	MAX96717_PINCTRL_INPUT_VALUE,
+};
+
+static const struct pinconf_generic_params max96717_cfg_params[] = {
+	{ "maxim,pull-strength-weak", MAX96717_PINCTRL_PULL_STRENGTH_WEAK, 0 },
+	{ "maxim,jitter-compensation", MAX96717_PINCTRL_JITTER_COMPENSATION_EN, 0 },
+	{ "maxim,gmsl-tx", MAX96717_PINCTRL_GMSL_TX_EN, 0 },
+	{ "maxim,gmsl-rx", MAX96717_PINCTRL_GMSL_RX_EN, 0 },
+	{ "maxim,gmsl-tx-id", MAX96717_PINCTRL_GMSL_TX_ID, 0 },
+	{ "maxim,gmsl-rx-id", MAX96717_PINCTRL_GMSL_RX_ID, 0 },
+	{ "maxim,rclkout-clock", MAX96717_PINCTRL_RCLKOUT_CLK, 0 },
+};
+
+static int max96717_ctrl_get_groups_count(struct pinctrl_dev *pctldev)
+{
+	return ARRAY_SIZE(max96717_ctrl_groups);
+}
+
+static const char *max96717_ctrl_get_group_name(struct pinctrl_dev *pctldev,
+						unsigned selector)
+{
+	return max96717_ctrl_groups[selector].name;
+}
+
+static int max96717_ctrl_get_group_pins(struct pinctrl_dev *pctldev, unsigned selector,
+					const unsigned **pins, unsigned *num_pins)
+{
+	*pins = (unsigned *) max96717_ctrl_groups[selector].pins;
+	*num_pins = max96717_ctrl_groups[selector].npins;
+
+	return 0;
+}
+
+static int max96717_get_pin_config_reg(unsigned int offset, u32 param,
+					unsigned int *reg, unsigned int *mask,
+					unsigned int *val)
+{
+	*reg = 0x2be + offset * 0x3;
+
+	switch (param) {
+	case PIN_CONFIG_OUTPUT_ENABLE:
+		*mask = BIT(0);
+		*val = 0b0;
+		return 0;
+	case PIN_CONFIG_INPUT_ENABLE:
+		*mask = BIT(0);
+		*val = 0b1;
+		return 0;
+	case MAX96717_PINCTRL_GMSL_TX_EN:
+		*mask = BIT(1);
+		*val = 0b1;
+		return 0;
+	case MAX96717_PINCTRL_GMSL_RX_EN:
+		*mask = BIT(2);
+		*val = 0b1;
+		return 0;
+	case MAX96717_PINCTRL_INPUT_VALUE:
+		*mask = BIT(3);
+		*val = 0b1;
+		return 0;
+	case PIN_CONFIG_OUTPUT:
+		*mask = BIT(4);
+		*val = 0b1;
+		return 0;
+	case MAX96717_PINCTRL_JITTER_COMPENSATION_EN:
+		*mask = BIT(5);
+		*val = 0b1;
+		return 0;
+	case MAX96717_PINCTRL_PULL_STRENGTH_WEAK:
+		*mask = BIT(7);
+		*val = 0b0;
+		return 0;
+	case MAX96717_PINCTRL_GMSL_TX_ID:
+		*reg += 1;
+		*mask = GENMASK(4, 0);
+		return 0;
+	case PIN_CONFIG_DRIVE_OPEN_DRAIN:
+		*reg += 1;
+		*mask = BIT(5);
+		*val = 0b0;
+		return 0;
+	case PIN_CONFIG_DRIVE_PUSH_PULL:
+		*reg += 1;
+		*mask = BIT(5);
+		*val = 0b1;
+		return 0;
+	case PIN_CONFIG_BIAS_DISABLE:
+		*reg += 1;
+		*mask = GENMASK(7, 6);
+		*val = 0b00;
+		return 0;
+	case PIN_CONFIG_BIAS_PULL_DOWN:
+		*reg += 1;
+		*mask = GENMASK(7, 6);
+		*val = 0b10;
+		return 0;
+	case PIN_CONFIG_BIAS_PULL_UP:
+		*reg += 1;
+		*mask = GENMASK(7, 6);
+		*val = 0b01;
+		return 0;
+	case PIN_CONFIG_SLEW_RATE:
+		*reg = 0x56f;
+
+		if (offset <= 2) {
+			*mask = GENMASK(1, 0) << (offset - 0) * 2;
+		} else if (offset <= 4) {
+			*reg += 1;
+			*mask = GENMASK(3, 2) << (offset - 3) * 2;
+		} else if (offset <= 6) {
+			return -EINVAL;
+		} else if (offset <= 8) {
+			*reg += 2;
+			*mask = GENMASK(5, 4) << (offset - 7) * 2;
+		} else {
+			return -EINVAL;
+		}
+		return 0;
+	case MAX96717_PINCTRL_GMSL_RX_ID:
+		*reg += 2;
+		*mask = GENMASK(4, 0);
+		return 0;
+	case MAX96717_PINCTRL_RCLKOUT_CLK:
+		*reg = 0x3;
+		*mask = GENMASK(1, 0);
+		return 0;
+	default:
+		return -ENOTSUPP;
+	}
+}
+
+static int max96717_conf_pin_config_get(struct pinctrl_dev *pctldev,
+					unsigned int offset,
+					unsigned long *config)
+{
+	struct max96717_priv *priv = pinctrl_dev_get_drvdata(pctldev);
+	u32 param = pinconf_to_config_param(*config);
+	unsigned int reg, mask, val;
+	int ret;
+
+	dev_dbg(priv->dev, "%s()\n", __func__);
+
+	ret = max96717_get_pin_config_reg(offset, param, &reg, &mask, &val);
+	if (ret)
+		return ret;
+
+	switch (param) {
+	case PIN_CONFIG_DRIVE_OPEN_DRAIN:
+	case PIN_CONFIG_DRIVE_PUSH_PULL:
+	case PIN_CONFIG_BIAS_DISABLE:
+	case PIN_CONFIG_BIAS_PULL_DOWN:
+	case PIN_CONFIG_BIAS_PULL_UP:
+		ret = max96717_read(priv, reg);
+		if (ret < 0)
+			return ret;
+
+		val = max96717_field_get(ret, mask) == val;
+		if (!val)
+			return -EINVAL;
+
+		break;
+	case MAX96717_PINCTRL_JITTER_COMPENSATION_EN:
+	case MAX96717_PINCTRL_PULL_STRENGTH_WEAK:
+	case MAX96717_PINCTRL_GMSL_TX_EN:
+	case MAX96717_PINCTRL_GMSL_RX_EN:
+	case MAX96717_PINCTRL_INPUT_VALUE:
+	case PIN_CONFIG_OUTPUT_ENABLE:
+	case PIN_CONFIG_INPUT_ENABLE:
+	case PIN_CONFIG_OUTPUT:
+		ret = max96717_read(priv, reg);
+		if (ret < 0)
+			return ret;
+
+		val = max96717_field_get(ret, mask) == val;
+		break;
+	case MAX96717_PINCTRL_GMSL_TX_ID:
+	case MAX96717_PINCTRL_GMSL_RX_ID:
+	case PIN_CONFIG_SLEW_RATE:
+	case MAX96717_PINCTRL_RCLKOUT_CLK:
+		ret = max96717_read(priv, reg);
+		if (ret < 0)
+			return ret;
+
+		val = max96717_field_get(val, mask);
+		break;
+	default:
+		return -ENOTSUPP;
+	}
+
+	*config = pinconf_to_config_packed(param, val);
+
+	return 0;
+}
+
+static int max96717_conf_pin_config_set_one(struct max96717_priv *priv,
+						unsigned int offset,
+						unsigned long config)
+{
+	u32 param = pinconf_to_config_param(config);
+	u32 arg = pinconf_to_config_argument(config);
+	unsigned int reg, mask, val;
+	int ret;
+
+	dev_dbg(priv->dev, "%s()\n", __func__);
+
+	ret = max96717_get_pin_config_reg(offset, param, &reg, &mask, &val);
+	if (ret)
+		return ret;
+
+	switch (param) {
+	case PIN_CONFIG_DRIVE_OPEN_DRAIN:
+	case PIN_CONFIG_DRIVE_PUSH_PULL:
+	case PIN_CONFIG_BIAS_DISABLE:
+	case PIN_CONFIG_BIAS_PULL_DOWN:
+	case PIN_CONFIG_BIAS_PULL_UP:
+		val = max96717_field_prep(val, mask);
+
+		ret = max96717_update_bits(priv, reg, mask, val);
+		break;
+	case MAX96717_PINCTRL_JITTER_COMPENSATION_EN:
+	case MAX96717_PINCTRL_PULL_STRENGTH_WEAK:
+	case MAX96717_PINCTRL_GMSL_TX_EN:
+	case MAX96717_PINCTRL_GMSL_RX_EN:
+	case PIN_CONFIG_OUTPUT_ENABLE:
+	case PIN_CONFIG_INPUT_ENABLE:
+	case PIN_CONFIG_OUTPUT:
+		val = max96717_field_prep(arg ? val : ~val, mask);
+
+		ret = max96717_update_bits(priv, reg, mask, val);
+		break;
+	case MAX96717_PINCTRL_GMSL_TX_ID:
+	case MAX96717_PINCTRL_GMSL_RX_ID:
+	case PIN_CONFIG_SLEW_RATE:
+	case MAX96717_PINCTRL_RCLKOUT_CLK:
+		val = max96717_field_prep(arg, mask);
+
+		ret = max96717_update_bits(priv, reg, mask, val);
+		break;
+	default:
+		return -ENOTSUPP;
+	}
+
+	if (ret)
+		return ret;
+
+	switch (param) {
+	case PIN_CONFIG_OUTPUT:
+		config = pinconf_to_config_packed(PIN_CONFIG_OUTPUT_ENABLE, 1);
+		return max96717_conf_pin_config_set_one(priv, offset, config);
+		break;
+	case PIN_CONFIG_OUTPUT_ENABLE:
+		config = pinconf_to_config_packed(MAX96717_PINCTRL_GMSL_RX_EN, 0);
+		return max96717_conf_pin_config_set_one(priv, offset, config);
+	default:
+		break;
+	}
+
+	return 0;
+}
+
+static int max96717_conf_pin_config_set(struct pinctrl_dev *pctldev,
+					unsigned int offset,
+					unsigned long *configs,
+					unsigned int num_configs)
+{
+	struct max96717_priv *priv = pinctrl_dev_get_drvdata(pctldev);
+	int ret;
+
+	dev_dbg(priv->dev, "%s()\n", __func__);
+
+	while (num_configs--) {
+		unsigned long config = *configs;
+
+		ret = max96717_conf_pin_config_set_one(priv, offset, config);
+		if (ret)
+			return ret;
+
+		configs++;
+	}
+
+	return 0;
+}
+
+static int max96717_mux_get_functions_count(struct pinctrl_dev *pctldev)
+{
+	return ARRAY_SIZE(max96717_functions);
+}
+
+static const char *max96717_mux_get_function_name(struct pinctrl_dev *pctldev,
+						unsigned selector)
+{
+	return max96717_functions[selector].name;
+}
+
+static int max96717_mux_get_groups(struct pinctrl_dev *pctldev,
+				unsigned selector,
+				const char * const **groups,
+				unsigned * const num_groups)
+{
+	*groups = max96717_functions[selector].groups;
+	*num_groups = max96717_functions[selector].ngroups;
+
+	return 0;
+}
+
+static int max96717_mux_set_pclk(struct max96717_priv *priv, unsigned int group)
+{
+	int ret;
+
+	ret = max96717_update_bits(priv, 0x3f1, BIT(0), BIT(0));
+	if (ret)
+		return ret;
+
+	ret = max96717_update_bits(priv, 0x3f1, GENMASK(5, 1),
+				FIELD_PREP(GENMASK(5, 1), group));
+	if (ret)
+		return ret;
+
+	return 0;
+}
+
+static int max96717_mux_set_rclkout(struct max96717_priv *priv, unsigned int group)
+{
+	int ret;
+
+	/* Enable RCLK. */
+	ret = max96717_update_bits(priv, 0x6, BIT(5), BIT(5));
+	if (ret)
+		return ret;
+
+	/* Enable RCLK output on PCLK. */
+	ret = max96717_update_bits(priv, 0x3f1, BIT(7), BIT(7));
+	if (ret)
+		return ret;
+
+	return 0;
+}
+
+static int max96717_mux_set(struct pinctrl_dev *pctldev, unsigned selector,
+				unsigned group)
+{
+	struct max96717_priv *priv = pinctrl_dev_get_drvdata(pctldev);
+	int ret;
+
+	switch (selector) {
+	case max96717_func_pclk:
+		return max96717_mux_set_pclk(priv, group);
+	case max96717_func_rclkout:
+		ret = max96717_mux_set_pclk(priv, group);
+		if (ret)
+			return ret;
+
+		return max96717_mux_set_rclkout(priv, group);
+	}
+
+	return 0;
+}
+
+static int max96717_gpio_get_direction(struct gpio_chip *gc, unsigned int offset)
+{
+	unsigned long config = pinconf_to_config_packed(PIN_CONFIG_OUTPUT_ENABLE, 0);
+	struct max96717_priv *priv = gpiochip_get_data(gc);
+	int ret;
+
+	dev_dbg(priv->dev, "%s()\n", __func__);
+
+	ret = max96717_conf_pin_config_get(priv->pctldev, offset, &config);
+	if (ret)
+		return ret;
+
+	return pinconf_to_config_argument(config) ? GPIO_LINE_DIRECTION_OUT
+						: GPIO_LINE_DIRECTION_IN;
+}
+
+static int max96717_gpio_direction_input(struct gpio_chip *gc, unsigned int offset)
+{
+	unsigned long config = pinconf_to_config_packed(PIN_CONFIG_INPUT_ENABLE, 1);
+	struct max96717_priv *priv = gpiochip_get_data(gc);
+
+	return max96717_conf_pin_config_set_one(priv, offset, config);
+}
+
+static int max96717_gpio_direction_output(struct gpio_chip *gc, unsigned int offset,
+					int value)
+{
+	unsigned long config = pinconf_to_config_packed(PIN_CONFIG_OUTPUT, value);
+	struct max96717_priv *priv = gpiochip_get_data(gc);
+
+	return max96717_conf_pin_config_set_one(priv, offset, config);
+}
+
+static int max96717_gpio_get(struct gpio_chip *gc, unsigned int offset)
+{
+	unsigned long config = pinconf_to_config_packed(MAX96717_PINCTRL_INPUT_VALUE, 0);
+	struct max96717_priv *priv = gpiochip_get_data(gc);
+	int ret;
+
+	ret = max96717_conf_pin_config_get(priv->pctldev, offset, &config);
+	if (ret)
+		return ret;
+
+	return pinconf_to_config_argument(config);
+}
+
+static void max96717_gpio_set(struct gpio_chip *gc, unsigned int offset, int value)
+{
+	unsigned long config = pinconf_to_config_packed(PIN_CONFIG_OUTPUT, value);
+	struct max96717_priv *priv = gpiochip_get_data(gc);
+	int ret;
+
+	dev_dbg(priv->dev, "%s()\n", __func__);
+
+	ret = max96717_conf_pin_config_set_one(priv, offset, config);
+	if (ret)
+		dev_err(priv->dev, "Failed to set GPIO %u output value, err: %d\n",
+			offset, ret);
 }
 
 static struct pinctrl_ops max96717_ctrl_ops = {
@@ -1806,21 +1830,6 @@ static const struct pinmux_ops max96717_mux_ops = {
 	.get_function_name = max96717_mux_get_function_name,
 	.get_function_groups = max96717_mux_get_groups,
 	.set_mux = max96717_mux_set,
-};
-
-static const struct max_ser_ops max96717_ops = {
-	.num_i2c_xlates = 2,
-	.log_status = max96717_log_status,
-	.log_pipe_status = max96717_log_pipe_status,
-	.log_phy_status = max96717_log_phy_status,
-	.set_pipe_enable = max96717_set_pipe_enable,
-	.update_pipe_dts = max96717_update_pipe_dts,
-	.update_pipe_vcs = max96717_update_pipe_vcs,
-	.init = max96717_init,
-	.init_i2c_xlate = max96717_init_i2c_xlate,
-	.init_phy = max96717_init_phy,
-	.init_pipe = max96717_init_pipe,
-	.post_init = max96717_post_init,
 };
 
 static int max96717_probe(struct i2c_client *client)
