@@ -1752,16 +1752,16 @@ static int max96724_init_fsync(struct max_des_priv *des_priv,
 	dev_dbg(priv->dev, "%s()\n", __func__);
 
 	if (fsync->internal || fsync->internal_output) {
-		ret = max96724_write(priv, 0x3b1, 0x00);
-		ret += max96724_write(priv, 0x3a2, 0x01);
-		ret += max96724_write(priv, 0x3a7, (fsync->freq >> 16) & 0xff);
-		ret += max96724_write(priv, 0x3a6, (fsync->freq >> 8) & 0xff);
-		ret += max96724_write(priv, 0x3a5, (fsync->freq >> 0) & 0xff);
-		ret += max96724_write(priv, 0x3af, 0xcf);
-		ret += max96724_write(priv, 0x3a0, fsync->internal_output << 2);
+		ret = max96724_write(priv, 0x4b1, 0x00);
+		ret += max96724_write(priv, 0x4a2, 0x01);
+		ret += max96724_write(priv, 0x4a7, (fsync->freq >> 16) & 0xff);
+		ret += max96724_write(priv, 0x4a6, (fsync->freq >> 8) & 0xff);
+		ret += max96724_write(priv, 0x4a5, (fsync->freq >> 0) & 0xff);
+		ret += max96724_write(priv, 0x4af, 0xcf);
+		ret += max96724_write(priv, 0x4a0, fsync->internal_output << 2);
 	}
 	else if (fsync->external) {
-		ret = max96724_write(priv, 0x3e0, fsync->external << 3);
+		ret = max96724_write(priv, 0x4a0, fsync->external << 3);
 	}
 
 	return ret;
