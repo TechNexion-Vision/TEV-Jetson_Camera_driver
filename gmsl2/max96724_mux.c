@@ -2016,7 +2016,7 @@ static int max96724_get_pin_config_reg(unsigned int offset, u32 param,
 		*val = 0b1;
 		return 0;
 	case MAX96724_PINCTRL_GMSL_TX_EN_C:
-		*reg = 0x6d;
+		*reg += 0x6d;
 		if (offset > 0)
 			*reg+=1;
 		if (offset > 5)
@@ -2025,7 +2025,7 @@ static int max96724_get_pin_config_reg(unsigned int offset, u32 param,
 		*val = 0b1;
 		return 0;
 	case MAX96724_PINCTRL_GMSL_RX_EN_C:
-		*reg = 0x6e;
+		*reg += 0x6e;
 		if (offset > 0)
 			*reg+=1;
 		if (offset > 5)
@@ -2034,14 +2034,14 @@ static int max96724_get_pin_config_reg(unsigned int offset, u32 param,
 		*val = 0b1;
 		return 0;
 	case MAX96724_PINCTRL_GMSL_TX_EN_D:
-		*reg = 0xa4;
+		*reg += 0xa4;
 		if (offset > 3)
 			*reg+=1;
 		*mask = BIT(5);
 		*val = 0b1;
 		return 0;
 	case MAX96724_PINCTRL_GMSL_RX_EN_D:
-		*reg = 0xa5;
+		*reg += 0xa5;
 		if (offset > 3)
 			*reg+=1;
 		*mask = BIT(5);
@@ -2068,7 +2068,7 @@ static int max96724_get_pin_config_reg(unsigned int offset, u32 param,
 		*mask = GENMASK(4, 0);
 		return 0;
 	case MAX96724_PINCTRL_GMSL_TX_ID_B:
-		*reg = 0x37;
+		*reg += 0x37;
 		if (offset > 2)
 			*reg+=1;
 		if (offset > 7)
@@ -2076,7 +2076,7 @@ static int max96724_get_pin_config_reg(unsigned int offset, u32 param,
 		*mask = GENMASK(4, 0);
 		return 0;
 	case MAX96724_PINCTRL_GMSL_TX_ID_C:
-		*reg = 0x6d;
+		*reg += 0x6d;
 		if (offset > 0)
 			*reg+=1;
 		if (offset > 5)
@@ -2084,7 +2084,7 @@ static int max96724_get_pin_config_reg(unsigned int offset, u32 param,
 		*mask = GENMASK(4, 0);
 		return 0;
 	case MAX96724_PINCTRL_GMSL_TX_ID_D:
-		*reg = 0xa4;
+		*reg += 0xa4;
 		if (offset > 3)
 			*reg+=1;
 		*mask = GENMASK(4, 0);
@@ -2119,7 +2119,7 @@ static int max96724_get_pin_config_reg(unsigned int offset, u32 param,
 		*mask = GENMASK(4, 0);
 		return 0;
 	case MAX96724_PINCTRL_GMSL_RX_ID_B:
-		*reg = 0x38;
+		*reg += 0x38;
 		if (offset > 2)
 			*reg+=1;
 		if (offset > 7)
@@ -2127,7 +2127,7 @@ static int max96724_get_pin_config_reg(unsigned int offset, u32 param,
 		*mask = GENMASK(4, 0);
 		return 0;
 	case MAX96724_PINCTRL_GMSL_RX_ID_C:
-		*reg = 0x6e;
+		*reg += 0x6e;
 		if (offset > 0)
 			*reg+=1;
 		if (offset > 5)
@@ -2135,7 +2135,7 @@ static int max96724_get_pin_config_reg(unsigned int offset, u32 param,
 		*mask = GENMASK(4, 0);
 		return 0;
 	case MAX96724_PINCTRL_GMSL_RX_ID_D:
-		*reg = 0xa5;
+		*reg += 0xa5;
 		if (offset > 3)
 			*reg+=1;
 		*mask = GENMASK(4, 0);
