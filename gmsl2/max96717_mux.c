@@ -985,11 +985,11 @@ static int max96717_init(struct max_ser_priv *ser_priv)
 		if (ret)
 			return ret;
 
-		ret = max96717_update_bits(priv, 0x315, mask,
-					ser_priv->tunnel_mode
-					? 0x00 : mask);
-		if (ret)
-			return ret;
+		// ret = max96717_update_bits(priv, 0x315, mask,
+		// 			ser_priv->tunnel_mode
+		// 			? 0x00 : mask);
+		// if (ret)
+		// 	return ret;
 	}
 
 	/* Disable ports. */

@@ -1662,6 +1662,17 @@ static int max96724_init_pipe(struct max_des_priv *des_priv,
 		return ret;
 
 	shift = 4;
+	if (des_priv->links[pipe->link_id].tunnel_mode) {
+		reg = 0x936 + 0x40 * index;
+		ret = max96724_update_bits(priv, reg, 0x01, 0x01);
+		if (ret)
+			return ret;
+
+		reg = 0x939 + 0x40 * index;
+		ret = max96724_update_bits(priv, reg, 0x40, 0x40);
+		if (ret)
+			return ret;
+	}
 	reg = 0x939 + 0x40 * index;
 	ret = max96724_update_bits(priv, reg, GENMASK(1, 0) << shift,
 				pipe->phy_id << shift);
