@@ -79,6 +79,8 @@
 #define HOST_COMMAND_ISP_CTRL_TRIGGER_MODE 						(0x317A)
 #define HOST_COMMAND_ISP_CTRL_FLICK_CTRL					 	(0x317C)
 #define HOST_COMMAND_ISP_CTRL_MIPI_FREQ 						(0x317E)
+#define HOST_COMMAND_ISP_CTRL_JPEG_QUAL							(0x3180)
+#define HOST_COMMAND_ISP_CTRL_PREVIEW_MIPI_CTRL 				(0x3182)
 
 /* Define host command register of ISP bootdata page */
 #define HOST_COMMAND_ISP_BOOTDATA_1                             (0x4000)
@@ -315,6 +317,7 @@ struct tevs {
 	bool hw_reset_mode;
 	int trigger_mode;
 	char *sensor_name;
+	int vc_id;
 
 	struct mutex lock; /* Protects formats */
 	/* V4L2 Controls */
@@ -465,7 +468,7 @@ static int tevs_check_version(struct tevs *tevs)
 	int ret = 0;
 
 	ret = tevs_i2c_read(tevs, HOST_COMMAND_TEVS_INFO_VERSION_MSB, &version[0], 4);
-	if(ret < 0) {
+	if (ret < 0) {
 		dev_err(dev, "can't check version\n");
 		return ret;
 	}
@@ -487,7 +490,7 @@ static int tevs_load_header_info(struct tevs *tevs)
 
 	ret = tevs_i2c_read(tevs, HOST_COMMAND_ISP_BOOTDATA_1, &header_ver, 1);
 
-	if(ret < 0) {
+	if (ret < 0) {
 		dev_err(dev, "can't recognize header info\n");
 		return ret;
 	}
@@ -1164,7 +1167,7 @@ static int tevs_ctrls_init(struct tevs *tevs)
 
 	ctrl_hdl = tevs->s_data->tegracam_ctrl_hdl;
 
-	if(ctrl_hdl == NULL){
+	if (ctrl_hdl == NULL) {
 		dev_info(&tevs->tc_dev->client->dev,"init control handler...\n");
 		ret = v4l2_ctrl_handler_init(&ctrl_hdl->ctrl_handler, 26);
 		if (ret) {
@@ -1524,7 +1527,7 @@ static int tevs_init_setting(struct tevs *tevs)
 {
 	int ret = 0;
 
-	if(tevs->trigger_mode) {
+	if (tevs->trigger_mode) {
 		ret = tevs_set_trigger_mode(tevs, tevs->trigger_mode);
 		if (ret != 0) {
 			dev_err(tevs->dev, "set trigger mode failed\n");
@@ -1538,6 +1541,9 @@ static int tevs_init_setting(struct tevs *tevs)
 	ret += tevs_i2c_write_16b(tevs,
 				HOST_COMMAND_ISP_CTRL_PREVIEW_HINF_CTRL,
 				0x10 | (tevs->continuous_clock << 5) | (tevs->data_lanes));
+	ret += tevs_i2c_write_16b(tevs,
+				HOST_COMMAND_ISP_CTRL_PREVIEW_MIPI_CTRL,
+				tevs->vc_id);
 	return ret;
 }
 
@@ -1552,10 +1558,10 @@ static int tevs_power_on(struct camera_common_data *s_data)
 	msleep(TEVS_BOOT_TIME);
 
 	ret = tevs_check_boot_state(tevs);
-	if(ret != 0)
+	if (ret != 0)
 		return ret;
 
-	if((tevs->hw_reset_mode | tevs->trigger_mode)) {
+	if ((tevs->hw_reset_mode | tevs->trigger_mode)) {
 		ret = tevs_init_setting(tevs);
 		if (ret != 0)
 			dev_err(tevs->dev, "init setting failed\n");
@@ -1569,7 +1575,7 @@ static int tevs_power_off(struct camera_common_data *s_data)
 	struct tevs *tevs = (struct tevs*)s_data->priv;
 	dev_dbg(tevs->dev, "%s()\n", __func__);
 
-	if(tevs->hw_reset_mode) {
+	if (tevs->hw_reset_mode) {
 		gpiod_set_value_cansleep(tevs->reset_gpio, 0);
 	}
 
@@ -1880,6 +1886,17 @@ static int tevs_setup(struct tevs *tevs)
 		}
 	}
 
+	tevs->vc_id = 0;
+	if (of_property_read_u32(tevs->dev->of_node, "vc-id",
+				 &tevs->vc_id) == 0) {
+		if (tevs->vc_id > 3) {
+			dev_err(tevs->dev,
+				"value of 'vc-id = <%d>' property is invaild\n",
+				tevs->vc_id);
+			return -EINVAL;
+		}
+	}
+
 	tevs->hw_reset_mode =
 		of_property_read_bool(tevs->dev->of_node, "hw-reset");
 
@@ -1896,14 +1913,15 @@ static int tevs_setup(struct tevs *tevs)
 
 	dev_dbg(tevs->dev,
 		"data-lanes [%d] ,continuous-clock [%d],"
-		" hw-reset [%d], trigger-mode [%d]\n",
+		" vc-id [%d], hw-reset [%d], trigger-mode [%d]\n",
 		tevs->data_lanes, tevs->continuous_clock,
-		tevs->hw_reset_mode, tevs->trigger_mode);
+		tevs->vc_id, tevs->hw_reset_mode, tevs->trigger_mode);
 
 	if (tevs_try_on(tevs) != 0) {
 		dev_err(tevs->dev, "cannot find tevs camera\n");
 		return -EINVAL;
 	}
+
 	if (tevs->data_frequency != 0) {
 		ret = tevs_i2c_write_16b(tevs,
 					HOST_COMMAND_ISP_CTRL_MIPI_FREQ,
@@ -1995,7 +2013,7 @@ static int tevs_setup(struct tevs *tevs)
 		break;
 	}
 
-	if((ret = tevs_init_setting(tevs)) != 0){
+	if ((ret = tevs_init_setting(tevs)) != 0) {
 		dev_err(tevs->dev, "init setting failed\n");
 		return ret;
 	}
@@ -2048,7 +2066,7 @@ static int tevs_probe(struct i2c_client *client,
 	tegracam_set_privdata(tc_dev, (void *)tevs);
 
 	ret = tevs_setup(tevs);
-	if(ret != 0) {
+	if (ret != 0) {
 		tegracam_device_unregister(tc_dev);
 		dev_err(dev, "tevs setup failed\n");
 		return ret;
