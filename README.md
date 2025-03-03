@@ -26,6 +26,7 @@
 | --- | --- |
 | TEVS | TEVS-AR0144-C<br>TEVS-AR0145-M<br>TEVS-AR0234-C<br>TEVS-AR0521-C<br>TEVS-AR0522-C<br>TEVS-AR0522-M<br>TEVS-AR0821-C<br>TEVS-AR0822-C<br>TEVS-AR1335-C |
 | VLS3 | VLS3-AR0144-C<br>VLS3-AR0145-M<br>VLS3-AR0234-C<br>VLS3-AR0521-C<br>VLS3-AR0522-C<br>VLS3-AR0522-M<br>VLS3-AR0821-C<br>VLS3-AR0822-C<br>VLS3-AR1335-C|
+| VLS-GM2 | VLS-GM2-AR0144-C<br>VLS-GM2-AR0145-M<br>VLS-GM2-AR0234-C<br>VLS-GM2-AR0521-C<br>VLS-GM2-AR0522-C<br>VLS-GM2-AR0522-M<br>VLS-GM2-AR0821-C<br>VLS-GM2-AR0822-C<br>VLS-GM2-AR1335-C|
 
 
 [More Camera Products Details...](https://www.technexion.com/products/embedded-vision)
@@ -53,6 +54,10 @@
 <a href="http://www.youtube.com/watch?feature=player_embedded&v=Ggu97E-KmsA" target="_blank">
  <img src="https://img.youtube.com/vi/Ggu97E-KmsA/0.jpg" alt="Watch the video"  width="640" height="360" />
 </a>
+
+**VLS-GM2-ORIN-EVK Adaptor for VLS-GM2**
+
+> Follow the [video](https://www.youtube.com/watch?v=Ggu97E-KmsA) to connect VLS-GM2 cameras and VLS-GM2-ORIN-EVK adaptor to **Jetson Orin Nano Developer Kit**.
 
 ---
 
@@ -100,15 +105,26 @@ Jetson Orin NANO Development Kits. Before start to install camera driver,
 You should BACKUP your image to avoid any file you lost while installing process.
 Do you want to continue?[Y/n]Y
 Continuing with the installation...
+Install TN-CAM modules: max96724.ko
+Install TN-CAM modules: max96717.ko
 Install TN-CAM modules: vls3.ko
 Install TN-CAM modules: tevs.ko
 Install TN-CAM DTBO file: tevs-dual
 Installed TN-CAM DTB file Done.
 Install TN-CAM DTBO file: vls3
 Installed TN-CAM DTB file Done.
+Install TN-CAM DTBO file: vls-gm2
+Installed TN-CAM DTB file Done.
+Install TN-CAM DTBO file: vls-gm2-fsync
+Installed TN-CAM DTB file Done.
+Install TN-CAM DTBO file: vls-gm2-tunnel
+Installed TN-CAM DTB file Done.
+Install TN-CAM DTBO file: vls-gm2-tunnel-fsync
+Installed TN-CAM DTB file Done.
 Select modules:
     [1]: TEVS: TEVS Series MIPI Cameras with TEV-RPI22 Adaptor
     [2]: VLS3: VLS3 Series Cameras with VLS3-ORIN-EVK Adaptor
+    [3]: VLS-GM2: VLS-GM2 Series Cameras with VLS-GM2-ORIN-EVK Adaptor
 Which modules do you select?[default:1]
 ```
 
