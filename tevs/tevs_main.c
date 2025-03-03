@@ -855,7 +855,7 @@ static int tevs_set_zoom_target(struct tevs *tevs, s32 value)
 
 static int tevs_set_bsl_mode(struct tevs *tevs, s32 mode)
 {
-	u8 val;
+	u16 val;
 	u8 bootcmd[6] = { 0x00, 0x12, 0x3A, 0x61, 0x44, 0xDE };
 	u8 startup[6] = { 0x00, 0x40, 0xE2, 0x51, 0x21, 0x5B };
 	u16 data_freq_tmp;
@@ -864,7 +864,7 @@ static int tevs_set_bsl_mode(struct tevs *tevs, s32 mode)
 	switch (mode) {
 	case TEVS_BSL_MODE_NORMAL_IDX:
 		tevs_i2c_write(tevs, 0x8001, startup, 6);
-		tevs_i2c_read(tevs, 0x8001, &val, 1);
+		tevs_i2c_read(tevs, 0x8001, (u8 *)&val, 1);
 
 		msleep(TEVS_BOOT_TIME);
 
@@ -888,6 +888,41 @@ static int tevs_set_bsl_mode(struct tevs *tevs, s32 mode)
 				}
 			}
 		}
+
+		if (tevs->trigger_mode) {
+			switch (tevs->trigger_mode) {
+			case TEVS_TRIGGER_MODE_DISABLE_IDX:
+				val = TEVS_TRIGGER_MODE_DISABLE;
+				break;
+			case TEVS_TRIGGER_MODE_SYNC_IDX:
+				val = TEVS_TRIGGER_MODE_SYNC;
+				break;
+			case TEVS_TRIGGER_MODE_PERIODIC_IDX:
+				val = TEVS_TRIGGER_MODE_PERIODIC;
+				break;
+			case TEVS_TRIGGER_MODE_NON_PERIODIC_IDX:
+				val = TEVS_TRIGGER_MODE_NON_PERIODIC;
+				break;
+			default:
+				val = TEVS_TRIGGER_MODE_DISABLE;
+				break;
+			}
+			val |= 0x380;
+			if (tevs_i2c_write_16b(tevs, TEVS_TRIGGER_MODE, val) != 0) {
+				dev_err(tevs->dev, "set trigger mode failed\n");
+				return -EINVAL;
+			}
+		}
+
+		tevs_i2c_write_16b(tevs,
+				HOST_COMMAND_ISP_CTRL_PREVIEW_FORMAT,
+				0x50);
+		tevs_i2c_write_16b(tevs,
+				HOST_COMMAND_ISP_CTRL_PREVIEW_HINF_CTRL,
+				0x10 | (tevs->continuous_clock << 5) | (tevs->data_lanes));
+		tevs_i2c_write_16b(tevs,
+				HOST_COMMAND_ISP_CTRL_PREVIEW_MIPI_CTRL,
+				tevs->vc_id);
 		break;
 	case TEVS_BSL_MODE_FLASH_IDX:
 		gpiod_set_value_cansleep(tevs->reset_gpio, 0);
@@ -899,7 +934,7 @@ static int tevs_set_bsl_mode(struct tevs *tevs, s32 mode)
 		gpiod_set_value_cansleep(tevs->standby_gpio, 0);
 		msleep(100);
 		tevs_i2c_write(tevs, 0x8001, bootcmd, 6);
-		tevs_i2c_read(tevs, 0x8001, &val, 1);
+		tevs_i2c_read(tevs, 0x8001, (u8 *)&val, 1);
 		break;
 	default:
 		dev_err(tevs->dev, "%s(): set err bls mode: %d", __func__,
@@ -1555,6 +1590,7 @@ static int tevs_power_on(struct camera_common_data *s_data)
 	dev_dbg(tevs->dev, "%s()\n", __func__);
 
 	gpiod_set_value_cansleep(tevs->reset_gpio, 1);
+
 	msleep(TEVS_BOOT_TIME);
 
 	ret = tevs_check_boot_state(tevs);
