@@ -12,7 +12,7 @@
 ## Supported JetPack Version
 
 - [JetPack 6.1](https://developer.nvidia.com/embedded/jetpack-sdk-61) [[L4T 36.4]](https://developer.nvidia.com/embedded/jetson-linux-r3640)
-- [JetPack 6.2](https://developer.nvidia.com/embedded/jetpack-sdk-62) [[L4T 36.4]](https://developer.nvidia.com/embedded/jetson-linux-r3643)
+- [JetPack 6.2](https://developer.nvidia.com/embedded/jetpack-sdk-62) [[L4T 36.4.3]](https://developer.nvidia.com/embedded/jetson-linux-r3643)
 
 </br>
 
@@ -57,7 +57,7 @@
 
 **VLS-GM2-ORIN-EVK Adaptor for VLS-GM2**
 
-> Follow the [video](https://www.youtube.com/watch?v=Ggu97E-KmsA) to connect VLS-GM2 cameras and VLS-GM2-ORIN-EVK adaptor to **Jetson Orin Nano Developer Kit**.
+> Follow the video to connect VLS-GM2 cameras and VLS-GM2-ORIN-EVK adaptor to **Jetson Orin Nano Developer Kit**.
 
 ---
 
