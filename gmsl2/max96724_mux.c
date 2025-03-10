@@ -1982,163 +1982,231 @@ static int max96724_get_pin_config_reg(unsigned int offset, u32 param,
 
 	switch (param) {
 	case PIN_CONFIG_OUTPUT_ENABLE:
+		if (offset > 4)
+			*reg += 1;
+		if (offset > 10)
+			*reg += 1;
 		*mask = BIT(0);
 		*val = 0b0;
 		return 0;
 	case PIN_CONFIG_INPUT_ENABLE:
+		if (offset > 4)
+			*reg += 1;
+		if (offset > 10)
+			*reg += 1;
 		*mask = BIT(0);
 		*val = 0b1;
 		return 0;
 	case MAX96724_PINCTRL_GMSL_TX_EN_A:
+		if (offset > 4)
+			*reg += 1;
+		if (offset > 10)
+			*reg += 1;
 		*mask = BIT(1);
 		*val = 0b1;
 		return 0;
 	case MAX96724_PINCTRL_GMSL_RX_EN_A:
+		if (offset > 4)
+			*reg += 1;
+		if (offset > 10)
+			*reg += 1;
 		*mask = BIT(2);
 		*val = 0b1;
 		return 0;
-	case MAX96724_PINCTRL_GMSL_TX_EN_B:
-		*reg += 0x37;
-		if (offset > 2)
-			*reg+=1;
-		if (offset > 7)
-			*reg+=1;
-		*mask = BIT(5);
-		*val = 0b1;
-		return 0;
-	case MAX96724_PINCTRL_GMSL_RX_EN_B:
-		*reg += 0x38;
-		if (offset > 2)
-			*reg+=1;
-		if (offset > 7)
-			*reg+=1;
-		*mask = BIT(5);
-		*val = 0b1;
-		return 0;
-	case MAX96724_PINCTRL_GMSL_TX_EN_C:
-		*reg += 0x6d;
-		if (offset > 0)
-			*reg+=1;
-		if (offset > 5)
-			*reg+=1;
-		*mask = BIT(5);
-		*val = 0b1;
-		return 0;
-	case MAX96724_PINCTRL_GMSL_RX_EN_C:
-		*reg += 0x6e;
-		if (offset > 0)
-			*reg+=1;
-		if (offset > 5)
-			*reg+=1;
-		*mask = BIT(5);
-		*val = 0b1;
-		return 0;
-	case MAX96724_PINCTRL_GMSL_TX_EN_D:
-		*reg += 0xa4;
-		if (offset > 3)
-			*reg+=1;
-		*mask = BIT(5);
-		*val = 0b1;
-		return 0;
-	case MAX96724_PINCTRL_GMSL_RX_EN_D:
-		*reg += 0xa5;
-		if (offset > 3)
-			*reg+=1;
-		*mask = BIT(5);
-		*val = 0b1;
-		return 0;
 	case MAX96724_PINCTRL_INPUT_VALUE:
+		if (offset > 4)
+			*reg += 1;
+		if (offset > 10)
+			*reg += 1;
 		*mask = BIT(3);
 		*val = 0b1;
 		return 0;
 	case PIN_CONFIG_OUTPUT:
+		if (offset > 4)
+			*reg += 1;
+		if (offset > 10)
+			*reg += 1;
 		*mask = BIT(4);
 		*val = 0b1;
 		return 0;
 	case MAX96724_PINCTRL_JITTER_COMPENSATION_EN:
+		if (offset > 4)
+			*reg += 1;
+		if (offset > 10)
+			*reg += 1;
 		*mask = BIT(5);
 		*val = 0b1;
 		return 0;
 	case MAX96724_PINCTRL_PULL_STRENGTH_WEAK:
+		if (offset > 4)
+			*reg += 1;
+		if (offset > 10)
+			*reg += 1;
 		*mask = BIT(7);
 		*val = 0b0;
 		return 0;
 	case MAX96724_PINCTRL_GMSL_TX_ID_A:
 		*reg += 1;
-		*mask = GENMASK(4, 0);
-		return 0;
-	case MAX96724_PINCTRL_GMSL_TX_ID_B:
-		*reg += 0x37;
-		if (offset > 2)
-			*reg+=1;
-		if (offset > 7)
-			*reg+=1;
-		*mask = GENMASK(4, 0);
-		return 0;
-	case MAX96724_PINCTRL_GMSL_TX_ID_C:
-		*reg += 0x6d;
-		if (offset > 0)
-			*reg+=1;
-		if (offset > 5)
-			*reg+=1;
-		*mask = GENMASK(4, 0);
-		return 0;
-	case MAX96724_PINCTRL_GMSL_TX_ID_D:
-		*reg += 0xa4;
-		if (offset > 3)
-			*reg+=1;
+		if (offset > 4)
+			*reg += 1;
+		if (offset > 10)
+			*reg += 1;
 		*mask = GENMASK(4, 0);
 		return 0;
 	case PIN_CONFIG_DRIVE_OPEN_DRAIN:
 		*reg += 1;
+		if (offset > 4)
+			*reg += 1;
+		if (offset > 10)
+			*reg += 1;
 		*mask = BIT(5);
 		*val = 0b0;
 		return 0;
 	case PIN_CONFIG_DRIVE_PUSH_PULL:
 		*reg += 1;
+		if (offset > 4)
+			*reg += 1;
+		if (offset > 10)
+			*reg += 1;
 		*mask = BIT(5);
 		*val = 0b1;
 		return 0;
 	case PIN_CONFIG_BIAS_DISABLE:
 		*reg += 1;
+		if (offset > 4)
+			*reg += 1;
+		if (offset > 10)
+			*reg += 1;
 		*mask = GENMASK(7, 6);
 		*val = 0b00;
 		return 0;
 	case PIN_CONFIG_BIAS_PULL_DOWN:
 		*reg += 1;
+		if (offset > 4)
+			*reg += 1;
+		if (offset > 10)
+			*reg += 1;
 		*mask = GENMASK(7, 6);
 		*val = 0b10;
 		return 0;
 	case PIN_CONFIG_BIAS_PULL_UP:
 		*reg += 1;
+		if (offset > 4)
+			*reg += 1;
+		if (offset > 10)
+			*reg += 1;
 		*mask = GENMASK(7, 6);
 		*val = 0b01;
 		return 0;
 	case MAX96724_PINCTRL_GMSL_RX_ID_A:
 		*reg += 2;
+		if (offset > 4)
+			*reg += 1;
+		if (offset > 10)
+			*reg += 1;
 		*mask = GENMASK(4, 0);
+		return 0;
+	case MAX96724_PINCTRL_GMSL_TX_ID_B:
+		*reg += 0x37;
+		if (offset > 2)
+			*reg += 1;
+		if (offset > 7)
+			*reg += 1;
+		*mask = GENMASK(4, 0);
+		return 0;
+	case MAX96724_PINCTRL_GMSL_TX_EN_B:
+		*reg += 0x37;
+		if (offset > 2)
+			*reg += 1;
+		if (offset > 7)
+			*reg += 1;
+		*mask = BIT(5);
+		*val = 0b1;
 		return 0;
 	case MAX96724_PINCTRL_GMSL_RX_ID_B:
 		*reg += 0x38;
 		if (offset > 2)
-			*reg+=1;
+			*reg += 1;
 		if (offset > 7)
-			*reg+=1;
+			*reg += 1;
 		*mask = GENMASK(4, 0);
+		return 0;
+	case MAX96724_PINCTRL_GMSL_RX_EN_B:
+		*reg += 0x38;
+		if (offset > 2)
+			*reg += 1;
+		if (offset > 7)
+			*reg += 1;
+		*mask = BIT(5);
+		*val = 0b1;
+		return 0;
+	case MAX96724_PINCTRL_GMSL_TX_ID_C:
+		*reg += 0x6d;
+		if (offset > 0)
+			*reg += 1;
+		if (offset > 5)
+			*reg += 1;
+		*mask = GENMASK(4, 0);
+		return 0;
+	case MAX96724_PINCTRL_GMSL_TX_EN_C:
+		*reg += 0x6d;
+		if (offset > 0)
+			*reg += 1;
+		if (offset > 5)
+			*reg += 1;
+		*mask = BIT(5);
+		*val = 0b1;
 		return 0;
 	case MAX96724_PINCTRL_GMSL_RX_ID_C:
 		*reg += 0x6e;
 		if (offset > 0)
-			*reg+=1;
+			*reg += 1;
 		if (offset > 5)
-			*reg+=1;
+			*reg += 1;
 		*mask = GENMASK(4, 0);
+		return 0;
+	case MAX96724_PINCTRL_GMSL_RX_EN_C:
+		*reg += 0x6e;
+		if (offset > 0)
+			*reg += 1;
+		if (offset > 5)
+			*reg += 1;
+		*mask = BIT(5);
+		*val = 0b1;
+		return 0;
+	case MAX96724_PINCTRL_GMSL_TX_ID_D:
+		*reg += 0xa4;
+		if (offset > 3)
+			*reg += 1;
+		if (offset > 8)
+			*reg += 1;
+		*mask = GENMASK(4, 0);
+		return 0;
+	case MAX96724_PINCTRL_GMSL_TX_EN_D:
+		*reg += 0xa4;
+		if (offset > 3)
+			*reg += 1;
+		if (offset > 8)
+			*reg += 1;
+		*mask = BIT(5);
+		*val = 0b1;
 		return 0;
 	case MAX96724_PINCTRL_GMSL_RX_ID_D:
 		*reg += 0xa5;
 		if (offset > 3)
-			*reg+=1;
+			*reg += 1;
+		if (offset > 8)
+			*reg += 1;
 		*mask = GENMASK(4, 0);
+		return 0;
+	case MAX96724_PINCTRL_GMSL_RX_EN_D:
+		*reg += 0xa5;
+		if (offset > 3)
+			*reg += 1;
+		if (offset > 8)
+			*reg += 1;
+		*mask = BIT(5);
+		*val = 0b1;
 		return 0;
 	default:
 		return -ENOTSUPP;
