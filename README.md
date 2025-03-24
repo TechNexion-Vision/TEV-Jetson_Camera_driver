@@ -18,23 +18,21 @@
 
 ## Support Camera Modules
 #### TEVI Series Cameras
-- TEVI-OV5640  
-- TEVI-AR0144-C
-- TEVI-AR0234-C
-- TEVI-AR0521-C
-- TEVI-AR0522-C
-- TEVI-AR0522-M
-- TEVI-AR0821-C
-- TEVI-AR1335-C
+- TEVI-OV5640
+- TEVI-AR0144
+- TEVI-AR0234
+- TEVI-AR0521
+- TEVI-AR0522
+- TEVI-AR0821
+- TEVI-AR1335
 
 #### TEVS Series Cameras
-- TEVS-AR0144-C
-- TEVS-AR0234-C
-- TEVS-AR0521-C
-- TEVS-AR0522-C
-- TEVS-AR0522-M
-- TEVS-AR0821-C
-- TEVS-AR1335-C
+- TEVS-AR0144
+- TEVS-AR0234
+- TEVS-AR0521
+- TEVS-AR0522
+- TEVS-AR0821
+- TEVS-AR1335
 
 
 [More Camera Products Details...](https://www.technexion.com/products/embedded-vision)
@@ -47,7 +45,7 @@
 
 ### Adaptor for Nvidia **Jetson NANO Development Kit**
 
-> Connect TN camera with adaptor to **Jetson Nano Developer Kit** directly. 
+> Connect TN camera with adaptor to **Jetson Nano Developer Kit** directly.
 
 <a href="https://www.technexion.com/products/embedded-vision/mipi-csi2/evk/tevs-ar0521-c-s85-ir-rpi15/" target="_blank">
  <img src="https://www.technexion.com/wp-content/uploads/2024/11/tevs-ar0521-c-s85-ir-rpi15.png" width="400" height="400" />
@@ -110,7 +108,7 @@ Select modules:
     [3]: TEVI-OV5640: TEVI-OV5640 Cameras with TEV-RPI15 Adaptor
 Which modules do you select?[default:1]
 ```
-   
+
 Note: You should reboot the device after installation.
 
 ---
