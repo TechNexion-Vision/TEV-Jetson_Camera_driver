@@ -276,6 +276,8 @@
 #define TEVS_BOOT_TIME						(250)
 #define TOTAL_MICROSEC_PERSEC				(1000000)
 
+#define TEVS_IMG_FORMAT_UYVY				(0x50)
+
 struct header_info {
 	u8 header_version;
 	u16 content_offset;
@@ -916,7 +918,7 @@ static int tevs_set_bsl_mode(struct tevs *tevs, s32 mode)
 
 		tevs_i2c_write_16b(tevs,
 				HOST_COMMAND_ISP_CTRL_PREVIEW_FORMAT,
-				0x50);
+				TEVS_IMG_FORMAT_UYVY);
 		tevs_i2c_write_16b(tevs,
 				HOST_COMMAND_ISP_CTRL_PREVIEW_HINF_CTRL,
 				0x10 | (tevs->continuous_clock << 5) | (tevs->data_lanes));
@@ -1572,7 +1574,7 @@ static int tevs_init_setting(struct tevs *tevs)
 
 	ret += tevs_i2c_write_16b(tevs,
 				HOST_COMMAND_ISP_CTRL_PREVIEW_FORMAT,
-				0x50);
+				TEVS_IMG_FORMAT_UYVY);
 	ret += tevs_i2c_write_16b(tevs,
 				HOST_COMMAND_ISP_CTRL_PREVIEW_HINF_CTRL,
 				0x10 | (tevs->continuous_clock << 5) | (tevs->data_lanes));
@@ -1716,21 +1718,22 @@ static int tevs_set_mode(struct tegracam_device *tc_dev)
 	struct tevs *tevs = tc_dev->priv;
 	int i;
 	dev_dbg(tc_dev->dev,
-		"%s() , {%d}, fmt_width=%d, fmt_height=%d\n",
+		"%s() , {%d}-{%d}, numfmt=%d, fmt=0x%x, fmt_width=%d, fmt_height=%d\n",
 		__func__,
 		s_data->mode,
-		tc_dev->s_data->fmt_width,
-		tc_dev->s_data->fmt_height);
+		s_data->mode_prop_idx,
+		s_data->numfmts,
+		s_data->colorfmt->code,
+		s_data->fmt_width,
+		s_data->fmt_height);
 
-	for(i = 0 ; i < tevs_sensor_table[tevs->selected_sensor].res_list_size ; i++)
-	{
+	for (i = 0 ; i < tevs_sensor_table[tevs->selected_sensor].res_list_size ; i++) {
 		if (tc_dev->s_data->fmt_width == tevs_sensor_table[tevs->selected_sensor].frmfmt[i].size.width &&
 				tc_dev->s_data->fmt_height == tevs_sensor_table[tevs->selected_sensor].frmfmt[i].size.height)
 			break;
 	}
 
-	if (i >= tevs_sensor_table[tevs->selected_sensor].res_list_size)
-	{
+	if (i >= tevs_sensor_table[tevs->selected_sensor].res_list_size) {
 		return -EINVAL;
 	}
 
@@ -1751,6 +1754,9 @@ static int tevs_start_streaming(struct tegracam_device *tc_dev)
 	    tevs_sensor_table[tevs->selected_sensor].res_list_size)
 		return -EINVAL;
 
+	if (!(tevs_check_trigger_mode(tevs) | tevs->hw_reset_mode))
+		ret = tevs_standby(tevs, 0);
+
 	fps = *tevs_sensor_table[tevs->selected_sensor]
 			  .frmfmt[tevs->selected_mode]
 			  .framerates;
@@ -1768,7 +1774,7 @@ static int tevs_start_streaming(struct tegracam_device *tc_dev)
 	tevs_i2c_write_16b(
 		tevs,
 		HOST_COMMAND_ISP_CTRL_PREVIEW_FORMAT,
-		0x50);
+		TEVS_IMG_FORMAT_UYVY);
 	tevs_i2c_write_16b(
 		tevs,
 		HOST_COMMAND_ISP_CTRL_PREVIEW_HINF_CTRL,
@@ -1799,9 +1805,12 @@ static int tevs_start_streaming(struct tegracam_device *tc_dev)
 	tevs_i2c_read(tevs, TEVS_AE_MANUAL_EXP_TIME, exp, 4);
 	tevs->exp_time->cur.val = be32_to_cpup((__be32 *)exp) &
 			TEVS_AE_MANUAL_EXP_TIME_MASK;
-
-	if (!(tevs_check_trigger_mode(tevs) | tevs->hw_reset_mode))
-		ret = tevs_standby(tevs, 0);
+	tevs_i2c_read(tevs, TEVS_AE_AUTO_EXP_TIME_UPPER, exp, 4);
+	tevs->ae_exp_upper->cur.val = be32_to_cpup((__be32 *)exp) &
+			TEVS_AE_MANUAL_EXP_TIME_MASK;
+	tevs_i2c_read(tevs, TEVS_AE_AUTO_EXP_TIME_MAX, exp, 4);
+	tevs->ae_exp_max->cur.val = be32_to_cpup((__be32 *)exp) &
+			TEVS_AE_MANUAL_EXP_TIME_MASK;
 
 	return ret;
 }
