@@ -134,7 +134,7 @@ Note: You should reboot the device after installation.
 
 #### Method 2 - Build drivers from source codes
 
-Please follow the [guide](https://developer.technexion.com/docs/how-to-build-technexion-camera-drivers-for-nvidia-jetpack6x) to build camera driver modules.
+Please follow the [guide](https://developer.technexion.com/docs/embedded-vision/tevs/usage-guides/nvidia/quick-start/technexion-camera-modules-for-jetpack-6x) to build camera driver modules.
 
 ---
 
@@ -222,6 +222,4 @@ nvvidconv ! nv3dsink sync=false
 ---
 ## WIKI Pages
 
-[TechNexion cameras with NVIDIA EVK guide](https://developer.technexion.com/docs/tevi-arxxxx-cameras-on-nvidia-jetson-nano)
-
-[TechNexion NVIDIA products guide](https://developer.technexion.com/docs/1)
+[TechNexion NVIDIA products guide](https://tn-docusaurus.vercel.app/docs/embedded-vision/tevs/usage-guides/nvidia/quick-start/)
