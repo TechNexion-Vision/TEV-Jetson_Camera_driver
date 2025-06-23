@@ -222,4 +222,4 @@ nvvidconv ! nv3dsink sync=false
 ---
 ## WIKI Pages
 
-[TechNexion NVIDIA products guide](https://tn-docusaurus.vercel.app/docs/embedded-vision/tevs/usage-guides/nvidia/quick-start/)
+[TechNexion NVIDIA products guide](https://developer.technexion.com/docs/embedded-vision/tevs/usage-guides/nvidia/quick-start/)
