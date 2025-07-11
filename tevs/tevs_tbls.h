@@ -80,7 +80,7 @@ static struct resolution ar1335_res_list[] = {
 	{ .width = 1920, .height = 1080, .framerates = 60, .mode = 3 },
 	{ .width = 2560, .height = 1440, .framerates = 30, .mode = 1 },
 	{ .width = 3840, .height = 2160, .framerates = 15, .mode = 0 },
-	{ .width = 4208, .height = 3120, .framerates = 10, .mode = 0 },
+	{ .width = 4224, .height = 3120, .framerates = 10, .mode = 0 },
 };
 
 struct sensor_info {
@@ -200,7 +200,7 @@ static const struct camera_common_frmfmt ar1335_frmfmt[] = {
 	{{1920, 1080}, &__60fps, 1, 0, 3},
 	{{2560, 1440}, &__30fps, 1, 0, 1},
 	{{3840, 2160}, &__15fps, 1, 0, 0},
-	{{4208, 3120}, &__10fps, 1, 0, 0},
+	{{4224, 3120}, &__10fps, 1, 0, 0},
 };
 
 struct sensor_info {
