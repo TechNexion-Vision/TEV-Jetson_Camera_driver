@@ -22,17 +22,22 @@
 
 ## Supported Camera Modules
 
-| **Camera Series** | **Products** |
-| --- | --- |
-| TEVS | TEVS-AR0144<br>TEVS-AR0145<br>TEVS-AR0234<br>TEVS-AR0521<br>TEVS-AR0522<br>TEVS-AR0821<br>TEVS-AR0822<br>TEVS-AR1335 |
-| VLS3 | VLS3-AR0144<br>VLS3-AR0145<br>VLS3-AR0234<br>VLS3-AR0521<br>VLS3-AR0522<br>VLS3-AR0821<br>VLS3-AR0822<br>VLS3-AR1335 |
-| VLS-GM2 | VLS-GM2-AR0144<br>VLS-GM2-AR0145<br>VLS-GM2-AR0234<br>VLS-GM2-AR0521<br>VLS-GM2-AR0522<br>VLS-GM2-AR0821<br>VLS-GM2-AR0822<br>VLS-GM2-AR1335 |
+## Support Camera Modules
 
-[More Camera Products Details...](https://www.technexion.com/products/embedded-vision)
+| **Camera Series** | Interface |
+| --- | --- |
+| [TEVS](https://www.technexion.com/products/embedded-vision/#mipi-csi-2-products) | MIPI-CSI2 |
+| [VLS3](https://www.technexion.com/products/serdes/fpd-link/fpd3#fpdlink-products) | FPD-LINK III |
+| [VLS-GM2](https://www.technexion.com/products/serdes/gmsl/gmsl2/#gmsl-products) | GMSL2 |
 
 ## Supported NVIDIA Jetson Developer Kit
 
 - [NVIDIA Jetson Orin NANO](https://developer.nvidia.com/embedded/learn/get-started-jetson-orin-nano-devkit)
+
+## Supported TechNexion NVIDIA TEK Series
+
+- [TEK6040-ORIN-NANO](https://www.technexion.com/products/embedded-computing/aivision/tek6040-orin-nano/)
+- [TEK6100-ORIN-NX](https://www.technexion.com/products/embedded-computing/aivision/tek6100-orin-nx/)
 
 ## WIKI Pages
 
