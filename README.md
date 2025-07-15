@@ -18,26 +18,23 @@
 
 ## Support Camera Modules
 
-| **Camera Series** | **Products** |
+| **Camera Series** | Interface |
 | --- | --- |
-| TEVS | TEVS-AR0144<br>TEVS-AR0145<br>TEVS-AR0234<br>TEVS-AR0521<br>TEVS-AR0522<br>TEVS-AR0821<br>TEVS-AR0822<br>TEVS-AR1335 |
-| TEVI (NRND) | TEVI-AR0144<br>TEVI-AR0234<br>TEVI-AR0521<br>TEVI-AR0522<br>TEVI-AR0821<br>TEVI-AR0822<br>TEVI-AR1335<br>TEVI-OV5640 |
-| VLS3 | VLS3-AR0144<br>VLS3-AR0145<br>VLS3-AR0234<br>VLS3-AR0521<br>VLS3-AR0522<br>VLS3-AR0821<br>VLS3-AR0822<br>VLS3-AR1335 |
+| [TEVS](https://www.technexion.com/products/embedded-vision/#mipi-csi-2-products) | MIPI-CSI2 |
+| [VLS3](https://www.technexion.com/products/serdes/fpd-link/fpd3#fpdlink-products) | FPD-LINK III |
+| TEVI (NRND) | MIPI-CSI2 |
 
-
-[More Camera Products Details...](https://www.technexion.com/products/embedded-vision)
 ## Supported NVIDIA Jetson Developer Kit
 
 - [NVIDIA Jetson Orin NANO](https://developer.nvidia.com/embedded/learn/get-started-jetson-orin-nano-devkit)
 
-## Supported TechNexion TEK Series
+## Supported TechNexion NVIDIA TEK Series
 
 - [TEK6040-ORIN-NANO](https://www.technexion.com/products/embedded-computing/aivision/tek6040-orin-nano/)
-- [TEK8021-NX-V](https://www.technexion.com/product/tek8021-nx-v/)
+- [TEK6100-ORIN-NX](https://www.technexion.com/products/embedded-computing/aivision/tek6100-orin-nx/)
 
 ---
 ## WIKI Pages
 
-[Getting Started](https://developer.technexion.com/docs/embedded-vision/tevs/usage-guides/nvidia/quick-start/technexion-camera-modules-for-jetpack-51x)
-
-[Build Guides](https://developer.technexion.com/docs/embedded-vision/tevs/usage-guides/nvidia/build-guides/nvidia-how-to-build-technexion-camera-drivers-for-jetpack5)
+- [Getting Started](https://developer.technexion.com/docs/embedded-vision/tevs/usage-guides/nvidia/quick-start/technexion-camera-modules-for-jetpack-51x)
+- [Build Guides](https://developer.technexion.com/docs/embedded-vision/tevs/usage-guides/nvidia/build-guides/nvidia-how-to-build-technexion-camera-drivers-for-jetpack5)
