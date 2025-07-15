@@ -22,8 +22,6 @@
 
 ## Supported Camera Modules
 
-## Support Camera Modules
-
 | **Camera Series** | Interface |
 | --- | --- |
 | [TEVS](https://www.technexion.com/products/embedded-vision/#mipi-csi-2-products) | MIPI-CSI2 |
