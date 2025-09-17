@@ -376,6 +376,10 @@ static int max_des_init(struct max_des_priv *priv)
 		ret = max_des_update_pipe_remaps(priv, pipe);
 		if (ret)
 			return ret;
+
+		dev_info(priv->dev, "link [%d]: %s mode",
+			pipe->link_id,
+			priv->links[pipe->link_id].tunnel_mode ? "tunnel" : "pixel");
 	}
 
 	if (priv->ops->init_link) {
@@ -395,6 +399,12 @@ static int max_des_init(struct max_des_priv *priv)
 		ret = priv->ops->init_fsync(priv, priv->fsync);
 		if (ret)
 			return ret;
+
+		dev_info(priv->dev, "%s mode",
+			priv->fsync->internal_output ? "internal fsync with output" :
+			priv->fsync->internal ? "internal fsync" :
+			priv->fsync->external ? "external fsync" :
+			"non-fsync");
 	}
 
 	return 0;
