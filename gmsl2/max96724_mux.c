@@ -2564,11 +2564,11 @@ static int max96724_probe(struct i2c_client *client)
 	}
 	else {
 		gpiod_set_value_cansleep(priv->reset_gpio, 0);
-		usleep_range(30, 50);
+		usleep_range(500, 600);
 		gpiod_set_value_cansleep(priv->reset_gpio, 1);
-		usleep_range(30, 50);
+		usleep_range(500, 600);
 	}
-	msleep(50);
+	msleep(60);
 
 	priv->i2c_addr_change = false;
 	ret = of_property_read_u32(dev->of_node, "phy-reg", &priv->i2c_addr);

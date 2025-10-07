@@ -2295,9 +2295,9 @@ static int max9296a_probe(struct i2c_client *client)
 	}
 	else {
 		gpiod_set_value_cansleep(priv->reset_gpio, 0);
-		usleep_range(30, 50);
+		usleep_range(500, 600);
 		gpiod_set_value_cansleep(priv->reset_gpio, 1);
-		usleep_range(30, 50);
+		usleep_range(500, 600);
 	}
 	msleep(50);
 
