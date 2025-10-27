@@ -74,7 +74,7 @@ static int max_ser_reset(struct regmap *regmap)
 	if (ret)
 		return ret;
 
-	msleep(50);
+	msleep(45);
 
 	return 0;
 }
@@ -1110,12 +1110,37 @@ static unsigned int max96724_field_prep(unsigned int val, unsigned int mask)
 	return (val << __ffs(mask)) & mask;
 }
 
+static int max_des_wait_for_multiple(struct i2c_client *client, struct regmap *regmap,
+				u8 *addrs, unsigned int num_addrs)
+{
+	unsigned int i, j, val;
+	int ret;
+
+	for (i = 0; i < 10; i++) {
+		for (j = 0; j < num_addrs; j++) {
+			client->addr = addrs[j];
+
+			ret = regmap_read(regmap, 0x0, &val);
+			if (ret >= 0) {
+				dev_dbg(&client->dev, "Find deserializer addr: 0x%02x\n", client->addr);
+				return 0;
+			}
+		}
+
+		msleep(100);
+
+		dev_dbg(&client->dev, "Retry %u waiting for deserializer: %d\n", i, ret);
+	}
+
+	return ret;
+}
+
 static int max96724_change_address(struct max96724_priv *priv)
 {
 	struct i2c_client *client;
 	struct regmap *regmap;
 	int ret;
-	unsigned int max96724_addr[4] = { 0x27, 0x2e, 0x4e, 0x4f };
+	u8 max96724_addr[4] = { 0x27, 0x2e, 0x4e, 0x4f };
 	unsigned int i;
 
 	dev_dbg(priv->dev, "%s()\n", __func__);
@@ -1136,13 +1161,34 @@ static int max96724_change_address(struct max96724_priv *priv)
 		goto err_unregister_client;
 	}
 
+	ret = max_des_wait_for_multiple(client, regmap, max96724_addr, ARRAY_SIZE(max96724_addr));
+	if (ret) {
+		dev_err(priv->dev,
+			"Failed waiting for deserializer with new or old address: %d\n", ret);
+		goto err_regmap_exit;
+	}
+
+	ret = regmap_write(regmap, 0x13, 0x40);
+	if (ret) {
+		dev_err(priv->dev, "Failed to soft reset deserializer: %d\n", ret);
+		goto err_regmap_exit;
+	}
+	msleep(10);
+
+	ret = max_des_wait_for_multiple(client, regmap, max96724_addr, ARRAY_SIZE(max96724_addr));
+	if (ret) {
+		dev_err(priv->dev,
+			"Failed waiting for deserializer with new or old address: %d\n", ret);
+		goto err_regmap_exit;
+	}
+
 	ret = regmap_write(regmap, 0x0, priv->client->addr << 1);
 	if (ret) {
 		dev_err(priv->dev, "Failed to change deserializer address: %d\n", ret);
 		goto err_regmap_exit;
 	}
 
-	for (i = 0; i < (sizeof(max96724_addr)/sizeof(unsigned int)); i++) {
+	for (i = 0; i < (sizeof(max96724_addr)/sizeof(u8)); i++) {
 		if (max96724_addr[i] == priv->client->addr) {
 			dev_info(priv->dev, "change addr to [%d] 0x%x\n", i, max96724_addr[i]);
 			regmap_update_bits(priv->regmap, 0x72, GENMASK(2, 0), i);
