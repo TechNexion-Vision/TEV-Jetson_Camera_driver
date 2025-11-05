@@ -13,6 +13,7 @@
 
 - [JetPack 6.1](https://developer.nvidia.com/embedded/jetpack-sdk-61) [[L4T 36.4]](https://developer.nvidia.com/embedded/jetson-linux-r3640)
 - [JetPack 6.2](https://developer.nvidia.com/embedded/jetpack-sdk-62) [[L4T 36.4.3]](https://developer.nvidia.com/embedded/jetson-linux-r3643)
+- [JetPack 6.2.1](https://developer.nvidia.com/embedded/jetpack-sdk-62) [[L4T 36.4.4]](https://developer.nvidia.com/embedded/jetson-linux-r3644)
 
 </br>
 
