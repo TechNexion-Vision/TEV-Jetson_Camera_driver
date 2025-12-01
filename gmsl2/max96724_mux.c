@@ -49,8 +49,8 @@ struct max96724_priv {
 	struct pinctrl_desc pctldesc;
 	struct gpio_chip gc;
 
-	bool i2c_addr_change;
 	unsigned int i2c_addr;
+	unsigned int source_id;
 
 	struct gpio_desc *reset_gpio;
 };
@@ -1793,13 +1793,104 @@ static int max_des_wait_for_multiple(struct i2c_client *client, struct regmap *r
 	return ret;
 }
 
+static int max96724_wait_for_device(struct max96724_priv *priv)
+{
+	unsigned int i;
+	int ret;
+
+	for (i = 0; i < 10; i++) {
+		ret = max96724_read(priv, 0x0);
+		if (ret >= 0)
+			return 0;
+
+		msleep(100);
+
+		dev_dbg(priv->dev, "Retry %u waiting for deserializer: %d\n", i, ret);
+	}
+
+	return ret;
+}
+
+static int max96724_reset(struct max96724_priv *priv)
+{
+	struct i2c_client *client;
+	struct regmap *regmap;
+	int ret;
+	u8 max96724_addr[2] = { priv->client->addr, priv->i2c_addr };
+
+	dev_dbg(priv->dev, "%s()\n", __func__);
+
+	if (priv->i2c_addr != priv->client->addr) {
+		client = i2c_new_dummy_device(priv->client->adapter, priv->i2c_addr);
+		if (IS_ERR(client)) {
+			ret = PTR_ERR(client);
+			dev_err(priv->dev,
+				"Failed to create I2C client: %d\n", ret);
+			return ret;
+		}
+
+		regmap = regmap_init_i2c(client, &max_des_i2c_regmap);
+		if (IS_ERR(regmap)) {
+			ret = PTR_ERR(regmap);
+			dev_err(priv->dev,
+				"Failed to create I2C regmap: %d\n", ret);
+			goto err_unregister_client;
+		}
+
+		ret = max_des_wait_for_multiple(client, regmap, max96724_addr, ARRAY_SIZE(max96724_addr));
+		if (ret) {
+			dev_err(priv->dev,
+				"Failed waiting for deserializer with new or old address: %d\n", ret);
+			goto err_regmap_exit;
+		}
+
+		ret = regmap_write(regmap, 0x13, 0x40);
+		if (ret) {
+			dev_err(priv->dev, "Failed to soft reset deserializer: %d\n", ret);
+			goto err_regmap_exit;
+		}
+		msleep(60);
+
+		ret = max_des_wait_for_multiple(client, regmap, max96724_addr, ARRAY_SIZE(max96724_addr));
+		if (ret) {
+			dev_err(priv->dev,
+				"Failed waiting for deserializer with new or old address: %d\n", ret);
+			goto err_regmap_exit;
+		}
+err_regmap_exit:
+		regmap_exit(regmap);
+
+err_unregister_client:
+		i2c_unregister_device(client);
+	}
+	else {
+		ret = max96724_wait_for_device(priv);
+		if (ret) {
+			dev_err(priv->dev, "Failed waiting for MAX96724, err: %d\n", ret);
+			return ret;
+		}
+
+		ret = max96724_update_bits(priv, 0x13, BIT(6), BIT(6));
+		if (ret)
+			return ret;
+
+		msleep(60);
+
+		ret = max96724_wait_for_device(priv);
+		if (ret) {
+			dev_err(priv->dev, "Failed waiting for MAX96724, err: %d\n", ret);
+			return ret;
+		}
+	}
+
+	return ret;
+}
+
 static int max96724_change_address(struct max96724_priv *priv)
 {
 	struct i2c_client *client;
 	struct regmap *regmap;
 	int ret;
-	u8 max96724_addr[4] = { 0x27, 0x2e, 0x4e, 0x4f };
-	unsigned int i;
 
 	dev_dbg(priv->dev, "%s()\n", __func__);
 
@@ -1819,78 +1910,35 @@ static int max96724_change_address(struct max96724_priv *priv)
 		goto err_unregister_client;
 	}
 
-	ret = max_des_wait_for_multiple(client, regmap, max96724_addr, ARRAY_SIZE(max96724_addr));
-	if (ret) {
-		dev_err(priv->dev,
-			"Failed waiting for deserializer with new or old address: %d\n", ret);
-		goto err_regmap_exit;
-	}
-
-	ret = regmap_write(regmap, 0x13, 0x40);
-	if (ret) {
-		dev_err(priv->dev, "Failed to soft reset deserializer: %d\n", ret);
-		goto err_regmap_exit;
-	}
-	msleep(10);
-
-	ret = max_des_wait_for_multiple(client, regmap, max96724_addr, ARRAY_SIZE(max96724_addr));
-	if (ret) {
-		dev_err(priv->dev,
-			"Failed waiting for deserializer with new or old address: %d\n", ret);
-		goto err_regmap_exit;
-	}
-
 	ret = regmap_write(regmap, 0x0, priv->client->addr << 1);
 	if (ret) {
 		dev_err(priv->dev, "Failed to change deserializer address: %d\n", ret);
 		goto err_regmap_exit;
 	}
 
-	for (i = 0; i < (sizeof(max96724_addr)/sizeof(u8)); i++) {
-		if (max96724_addr[i] == priv->client->addr) {
-			dev_info(priv->dev, "change addr to [%d] 0x%x\n", i, max96724_addr[i]);
-			regmap_update_bits(priv->regmap, 0x72, GENMASK(2, 0), i);
-			regmap_update_bits(priv->regmap, 0x76, GENMASK(2, 0), i);
-			regmap_update_bits(priv->regmap, 0x7a, GENMASK(2, 0), i);
-			regmap_update_bits(priv->regmap, 0x7e, GENMASK(2, 0), i);
-			regmap_update_bits(priv->regmap, 0xa3, GENMASK(2, 0), i);
-			regmap_update_bits(priv->regmap, 0xab, GENMASK(2, 0), i);
-			regmap_update_bits(priv->regmap, 0xb3, GENMASK(2, 0), i);
-			regmap_update_bits(priv->regmap, 0xbb, GENMASK(2, 0), i);
-			regmap_update_bits(priv->regmap, 0x503, GENMASK(2, 0), i);
-			regmap_update_bits(priv->regmap, 0x513, GENMASK(2, 0), i);
-			regmap_update_bits(priv->regmap, 0x523, GENMASK(2, 0), i);
-			regmap_update_bits(priv->regmap, 0x533, GENMASK(2, 0), i);
-			regmap_update_bits(priv->regmap, 0x563, GENMASK(2, 0), i);
-			regmap_update_bits(priv->regmap, 0x573, GENMASK(2, 0), i);
-			regmap_update_bits(priv->regmap, 0x583, GENMASK(2, 0), i);
-			regmap_update_bits(priv->regmap, 0x593, GENMASK(2, 0), i);
-		}
-	}
+	dev_info(priv->dev, "change addr to 0x%x\n", client->addr);
+	regmap_update_bits(priv->regmap, 0x72, GENMASK(2, 0), priv->source_id);
+	regmap_update_bits(priv->regmap, 0x76, GENMASK(2, 0), priv->source_id);
+	regmap_update_bits(priv->regmap, 0x7a, GENMASK(2, 0), priv->source_id);
+	regmap_update_bits(priv->regmap, 0x7e, GENMASK(2, 0), priv->source_id);
+	regmap_update_bits(priv->regmap, 0xa3, GENMASK(2, 0), priv->source_id);
+	regmap_update_bits(priv->regmap, 0xab, GENMASK(2, 0), priv->source_id);
+	regmap_update_bits(priv->regmap, 0xb3, GENMASK(2, 0), priv->source_id);
+	regmap_update_bits(priv->regmap, 0xbb, GENMASK(2, 0), priv->source_id);
+	regmap_update_bits(priv->regmap, 0x503, GENMASK(2, 0), priv->source_id);
+	regmap_update_bits(priv->regmap, 0x513, GENMASK(2, 0), priv->source_id);
+	regmap_update_bits(priv->regmap, 0x523, GENMASK(2, 0), priv->source_id);
+	regmap_update_bits(priv->regmap, 0x533, GENMASK(2, 0), priv->source_id);
+	regmap_update_bits(priv->regmap, 0x563, GENMASK(2, 0), priv->source_id);
+	regmap_update_bits(priv->regmap, 0x573, GENMASK(2, 0), priv->source_id);
+	regmap_update_bits(priv->regmap, 0x583, GENMASK(2, 0), priv->source_id);
+	regmap_update_bits(priv->regmap, 0x593, GENMASK(2, 0), priv->source_id);
 
 err_regmap_exit:
 	regmap_exit(regmap);
 
 err_unregister_client:
 	i2c_unregister_device(client);
-
-	return ret;
-}
-
-static int max96724_wait_for_device(struct max96724_priv *priv)
-{
-	unsigned int i;
-	int ret;
-
-	for (i = 0; i < 10; i++) {
-		ret = max96724_read(priv, 0x0);
-		if (ret >= 0)
-			return 0;
-
-		msleep(100);
-
-		dev_dbg(priv->dev, "Retry %u waiting for deserializer: %d\n", i, ret);
-	}
 
 	return ret;
 }
@@ -2027,39 +2075,6 @@ static int max96724_init_lane_config(struct max96724_priv *priv)
 				max96724_lane_configs[i].bit);
 	if (ret)
 		return ret;
-
-	return 0;
-}
-
-static int max96724_reset(struct max96724_priv *priv)
-{
-	int ret;
-
-	dev_dbg(priv->dev, "%s()\n", __func__);
-
-	ret = max96724_wait_for_device(priv);
-	if (ret) {
-		dev_err(priv->dev, "Failed waiting for MAX96724, err: %d\n", ret);
-		return ret;
-	}
-
-	ret = max96724_update_bits(priv, 0x13, 0x40, 0x40);
-	if (ret)
-		return ret;
-
-	msleep(10);
-
-	if (priv->i2c_addr_change) {
-		max96724_change_address(priv);
-		if (ret)
-			return ret;
-	}
-
-	ret = max96724_wait_for_device(priv);
-	if (ret) {
-		dev_err(priv->dev, "Failed waiting for MAX96724, err: %d\n", ret);
-		return ret;
-	}
 
 	return 0;
 }
@@ -2648,6 +2663,14 @@ static int max96724_probe(struct i2c_client *client)
 	priv->des_priv.regmap = priv->regmap;
 	priv->des_priv.ops = &max96724_ops;
 
+	priv->i2c_addr = priv->client->addr;
+	of_property_read_u32(dev->of_node, "phy-reg", &priv->i2c_addr);
+	of_property_read_u32(dev->of_node, "source-id", &priv->source_id);
+	if (priv->source_id > 0x7) {
+		dev_err(dev, "source-id should be [0 - 7]\n");
+		return -EINVAL;
+	}
+
 	priv->reset_gpio =
 		devm_gpiod_get_optional(priv->dev, "reset", GPIOD_OUT_LOW);
 	if (IS_ERR_OR_NULL(priv->reset_gpio)) {
@@ -2664,21 +2687,15 @@ static int max96724_probe(struct i2c_client *client)
 	}
 	msleep(60);
 
-	priv->i2c_addr_change = false;
-	ret = of_property_read_u32(dev->of_node, "phy-reg", &priv->i2c_addr);
-	if (!ret) {
-		if (priv->i2c_addr != priv->client->addr) {
-			priv->i2c_addr_change = true;
-			ret = max96724_change_address(priv);
-			if (ret)
-				return ret;
-		}
-	}
-
 	ret = max96724_reset(priv);
 	if (ret)
 		return ret;
 
+	if (priv->i2c_addr != priv->client->addr) {
+		ret = max96724_change_address(priv);
+		if (ret)
+			return ret;
+	}
 
 	return max_des_probe(&priv->des_priv);
 }
