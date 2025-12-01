@@ -334,6 +334,12 @@ static int max_des_init(struct max_des_priv *priv)
 		ret = priv->ops->init_fsync(priv, priv->fsync);
 		if (ret)
 			return ret;
+
+		dev_info(priv->dev, "%s mode",
+			priv->fsync->internal_output ? "internal fsync with output" :
+			priv->fsync->internal ? "internal fsync" :
+			priv->fsync->external ? "external fsync" :
+			"non-fsync");
 	}
 
 	return 0;
@@ -2195,7 +2201,7 @@ static int max9296a_init_fsync(struct max_des_priv *des_priv,
 
 	if (fsync->internal || fsync->internal_output) {
 		ret = max9296a_write(priv, 0x3f1, 0x00);
-		ret += max9296a_write(priv, 0x3e2, 0x00);
+		ret += max9296a_write(priv, 0x3e2, 0x01);
 		ret += max9296a_write(priv, 0x3ea, 0x00);
 		ret += max9296a_write(priv, 0x3eb, 0x00);
 		ret += max9296a_write(priv, 0x3e7, (fsync->freq >> 16) & 0xff);
