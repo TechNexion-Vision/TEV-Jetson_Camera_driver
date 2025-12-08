@@ -24,7 +24,7 @@
 const struct regmap_config max_ser_i2c_regmap = {
 	.reg_bits = 16,
 	.val_bits = 8,
-	.max_register = 0x1f00,
+	.max_register = 0xffff,
 };
 
 struct max_ser_asd {
