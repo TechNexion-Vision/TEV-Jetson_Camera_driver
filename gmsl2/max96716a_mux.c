@@ -557,6 +557,7 @@ static int max_des_parse_link_ser_xlate(struct max_des_priv *priv)
 	ret = 0;
 	for (i = 0; i < priv->ops->num_links; i++) {
 		struct max_des_link *link = &priv->links[i];
+		struct max_des_pipe *pipe = &priv->pipes[i];
 
 		if (!link->enabled)
 			continue;
@@ -591,6 +592,7 @@ static int max_des_parse_link_ser_xlate(struct max_des_priv *priv)
 		ret = max_des_init_link_ser_xlate(priv, link, xlate->dst, xlate->src, xlate->id);
 		if (ret != 0) {
 			link->enabled = false;
+			pipe->enabled = false;
 			continue;
 		}
 	}
