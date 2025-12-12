@@ -2498,7 +2498,7 @@ static int max96724_init_fsync(struct max_des_priv *des_priv,
 
 	if (fsync->internal || fsync->internal_output) {
 		ret = max96724_write(priv, 0x4b1, 0x00);
-		ret += max96724_write(priv, 0x4a2, 0x01);
+		ret += max96724_write(priv, 0x4a2, 0x81);
 		ret += max96724_write(priv, 0x4a7, (fsync->freq >> 16) & 0xff);
 		ret += max96724_write(priv, 0x4a6, (fsync->freq >> 8) & 0xff);
 		ret += max96724_write(priv, 0x4a5, (fsync->freq >> 0) & 0xff);
