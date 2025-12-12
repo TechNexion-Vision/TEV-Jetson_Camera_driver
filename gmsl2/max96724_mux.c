@@ -2072,8 +2072,11 @@ static int max96724_check_gmsl_links(struct max_des_priv *des_priv)
 		if (current_link == -1)
 			break;
 
-		if ((max96724_read(priv, link_lock_addr[current_link]) & BIT(3)) == BIT(3))
+		des_priv->pipes[current_link].enabled = false;
+		if ((max96724_read(priv, link_lock_addr[current_link]) & BIT(3)) == BIT(3)) {
 			locked_links_mask |= BIT(current_link);
+			des_priv->pipes[current_link].enabled = true;
+		}
 
 		links_mask &= ~BIT(current_link);
 
