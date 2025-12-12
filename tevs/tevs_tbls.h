@@ -1,6 +1,16 @@
 #ifndef __SENSOR_TABLES_H__
 #define __SENSOR_TABLES_H__
 
+#define SENSOR_CHIP_ID_NONE					0x0000
+#define SENSOR_CHIP_ID_ONSEMI_AR0144		0x0356
+#define SENSOR_CHIP_ID_ONSEMI_AR0145		0x1750
+#define SENSOR_CHIP_ID_ONSEMI_AR0234		0x0A56
+#define SENSOR_CHIP_ID_ONSEMI_AR0521		0x0457
+#define SENSOR_CHIP_ID_ONSEMI_AR0522		0x1457
+#define SENSOR_CHIP_ID_ONSEMI_AR0821		0x2557
+#define SENSOR_CHIP_ID_ONSEMI_AR0822		0x0F56
+#define SENSOR_CHIP_ID_ONSEMI_AR1335		0x0153
+
 enum
 {
 	TEVS_AR0144 = 0,
@@ -153,6 +163,7 @@ static const struct camera_common_frmfmt ar0144_frmfmt[] = {
 	{{1280, 720}, &__60fps, 1, 0, 0},
 	{{1280, 800}, &__60fps, 1, 0, 0},
 };
+
 static const struct camera_common_frmfmt ar0145_frmfmt[] = {
 	{{640, 480}, &__115fps, 1, 0, 0},
 	{{1280, 720}, &__115fps, 1, 0, 0},
@@ -164,6 +175,7 @@ static const struct camera_common_frmfmt ar0234_frmfmt[] = {
 	{{1920, 1080}, &__60fps, 1, 0, 0},
 	{{1920, 1200}, &__60fps, 1, 0, 0},
 };
+
 static const struct camera_common_frmfmt ar0521_frmfmt[] = {
 	{{640, 480}, &__120fps, 1, 0, 3},
 	{{1280, 720}, &__60fps, 1, 0, 3},
@@ -172,6 +184,7 @@ static const struct camera_common_frmfmt ar0521_frmfmt[] = {
 	{{2560, 1440}, &__32fps, 1, 0, 1},
 	{{2592, 1944}, &__24fps, 1, 0, 1},
 };
+
 static const struct camera_common_frmfmt ar0522_frmfmt[] = {
 	{{640, 480}, &__120fps, 1, 0, 3},
 	{{1280, 720}, &__60fps, 1, 0, 3},
@@ -180,6 +193,7 @@ static const struct camera_common_frmfmt ar0522_frmfmt[] = {
 	{{2560, 1440}, &__32fps, 1, 0, 1},
 	{{2592, 1944}, &__24fps, 1, 0, 1},
 };
+
 static const struct camera_common_frmfmt ar0821_frmfmt[] = {
 	{{640, 480}, &__60fps, 1, 0, 2},
 	{{1280, 720}, &__60fps, 1, 0, 2},
@@ -187,6 +201,7 @@ static const struct camera_common_frmfmt ar0821_frmfmt[] = {
 	{{2560, 1440}, &__30fps, 1, 0, 0},
 	{{3840, 2160}, &__15fps, 1, 0, 0},
 };
+
 static const struct camera_common_frmfmt ar0822_frmfmt[] = {
 	{{640, 480}, &__60fps, 1, 0, 1},
 	{{1280, 720}, &__60fps, 1, 0, 1},
@@ -194,6 +209,7 @@ static const struct camera_common_frmfmt ar0822_frmfmt[] = {
 	{{2560, 1440}, &__30fps, 1, 0, 0},
 	{{3840, 2160}, &__15fps, 1, 0, 0},
 };
+
 static const struct camera_common_frmfmt ar1335_frmfmt[] = {
 	{{640, 480}, &__60fps, 1, 0, 4},
 	{{1280, 720}, &__120fps, 1, 0, 4},
@@ -204,53 +220,46 @@ static const struct camera_common_frmfmt ar1335_frmfmt[] = {
 };
 
 struct sensor_info {
-	const char* sensor_name;
+    const u16 chip_id;
+	const char *sensor_name;
 	const struct camera_common_frmfmt *frmfmt;
 	u32 res_list_size;
 };
 
 
 static struct sensor_info tevs_sensor_table[] = {
-	{
-		.sensor_name = "TEVS-AR0144",
-		.frmfmt = ar0144_frmfmt,
-		.res_list_size = ARRAY_SIZE(ar0144_frmfmt)
-	},
-	{
-		.sensor_name = "TEVS-AR0145",
-		.frmfmt = ar0145_frmfmt,
-		.res_list_size = ARRAY_SIZE(ar0145_frmfmt)
-	},
-	{
-		.sensor_name = "TEVS-AR0234",
-		.frmfmt = ar0234_frmfmt,
-		.res_list_size = ARRAY_SIZE(ar0234_frmfmt)
-	},
-	{
-		.sensor_name = "TEVS-AR0521",
-		.frmfmt = ar0521_frmfmt,
-		.res_list_size = ARRAY_SIZE(ar0521_frmfmt)
-	},
-	{
-		.sensor_name = "TEVS-AR0522",
-		.frmfmt = ar0522_frmfmt,
-		.res_list_size = ARRAY_SIZE(ar0522_frmfmt)
-	},
-	{
-		.sensor_name = "TEVS-AR0821",
-		.frmfmt = ar0821_frmfmt,
-		.res_list_size = ARRAY_SIZE(ar0821_frmfmt)
-	},
-	{
-		.sensor_name = "TEVS-AR0822",
-		.frmfmt = ar0822_frmfmt,
-		.res_list_size = ARRAY_SIZE(ar0822_frmfmt)
-	},
-	{
-		.sensor_name = "TEVS-AR1335",
-		.frmfmt = ar1335_frmfmt,
-		.res_list_size = ARRAY_SIZE(ar1335_frmfmt)
-	},
+	{ .chip_id = SENSOR_CHIP_ID_ONSEMI_AR0144,
+      .sensor_name = "TEVS-AR0144",
+	  .frmfmt = ar0144_frmfmt,
+	  .res_list_size = ARRAY_SIZE(ar0144_frmfmt) },
+	{ .chip_id = SENSOR_CHIP_ID_ONSEMI_AR0145,
+      .sensor_name = "TEVS-AR0145",
+	  .frmfmt = ar0145_frmfmt,
+	  .res_list_size = ARRAY_SIZE(ar0145_frmfmt) },
+	{ .chip_id = SENSOR_CHIP_ID_ONSEMI_AR0234,
+      .sensor_name = "TEVS-AR0234",
+	  .frmfmt = ar0234_frmfmt,
+	  .res_list_size = ARRAY_SIZE(ar0234_frmfmt) },
+	{ .chip_id = SENSOR_CHIP_ID_ONSEMI_AR0521,
+      .sensor_name = "TEVS-AR0521",
+	  .frmfmt = ar0521_frmfmt,
+	  .res_list_size = ARRAY_SIZE(ar0521_frmfmt) },
+	{ .chip_id = SENSOR_CHIP_ID_ONSEMI_AR0522,
+      .sensor_name = "TEVS-AR0522",
+	  .frmfmt = ar0522_frmfmt,
+	  .res_list_size = ARRAY_SIZE(ar0522_frmfmt) },
+	{ .chip_id = SENSOR_CHIP_ID_ONSEMI_AR0821,
+      .sensor_name = "TEVS-AR0821",
+	  .frmfmt = ar0821_frmfmt,
+	  .res_list_size = ARRAY_SIZE(ar0821_frmfmt) },
+	{ .chip_id = SENSOR_CHIP_ID_ONSEMI_AR0822,
+      .sensor_name = "TEVS-AR0822",
+	  .frmfmt = ar0822_frmfmt,
+	  .res_list_size = ARRAY_SIZE(ar0822_frmfmt) },
+	{ .chip_id = SENSOR_CHIP_ID_ONSEMI_AR1335,
+      .sensor_name = "TEVS-AR1335",
+	  .frmfmt = ar1335_frmfmt,
+	  .res_list_size = ARRAY_SIZE(ar1335_frmfmt) },
 };
 
 #endif

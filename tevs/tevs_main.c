@@ -5,6 +5,7 @@
 
 #include <media/tegra-v4l2-camera.h>
 #include <media/camera_common.h>
+#include <media/v4l2-fwnode.h>
 #include "tevs_tbls.h"
 
 #define DRIVER_NAME "tevs"
@@ -13,6 +14,10 @@
 #define HOST_COMMAND_TEVS_INFO_VERSION_MSB 						(0x3000)
 #define HOST_COMMAND_TEVS_INFO_VERSION_LSB 						(0x3002)
 #define HOST_COMMAND_TEVS_BOOT_STATE 							(0x3004)
+#define HOST_COMMAND_TEVS_SENSOR_CHIP_ID						(0x3008)
+#define HOST_COMMAND_TEVS_MODEL_NUMBER_0						(0x3020)
+#define HOST_COMMAND_TEVS_MODEL_NUMBER_1						(0x3022)
+#define HOST_COMMAND_TEVS_MODEL_NUMBER_2						(0x3024)
 
 /* Define host command register of ISP control page */
 #define HOST_COMMAND_ISP_CTRL_PREVIEW_WIDTH 					(0x3100)
@@ -83,73 +88,73 @@
 #define HOST_COMMAND_ISP_CTRL_PREVIEW_MIPI_CTRL 				(0x3182)
 
 /* Define host command register of ISP bootdata page */
-#define HOST_COMMAND_ISP_BOOTDATA_1                             (0x4000)
-#define HOST_COMMAND_ISP_BOOTDATA_2                             (0x4002)
-#define HOST_COMMAND_ISP_BOOTDATA_3                             (0x4004)
-#define HOST_COMMAND_ISP_BOOTDATA_4                             (0x4006)
-#define HOST_COMMAND_ISP_BOOTDATA_5                             (0x4008)
-#define HOST_COMMAND_ISP_BOOTDATA_6                             (0x400A)
-#define HOST_COMMAND_ISP_BOOTDATA_7                             (0x400C)
-#define HOST_COMMAND_ISP_BOOTDATA_8                             (0x400E)
-#define HOST_COMMAND_ISP_BOOTDATA_9                             (0x4010)
-#define HOST_COMMAND_ISP_BOOTDATA_10                            (0x4012)
-#define HOST_COMMAND_ISP_BOOTDATA_11                            (0x4014)
-#define HOST_COMMAND_ISP_BOOTDATA_12                            (0x4016)
-#define HOST_COMMAND_ISP_BOOTDATA_13                            (0x4018)
-#define HOST_COMMAND_ISP_BOOTDATA_14                            (0x401A)
-#define HOST_COMMAND_ISP_BOOTDATA_15                            (0x401C)
-#define HOST_COMMAND_ISP_BOOTDATA_16                            (0x401E)
-#define HOST_COMMAND_ISP_BOOTDATA_17                            (0x4020)
-#define HOST_COMMAND_ISP_BOOTDATA_18                            (0x4022)
-#define HOST_COMMAND_ISP_BOOTDATA_19                            (0x4024)
-#define HOST_COMMAND_ISP_BOOTDATA_20                            (0x4026)
-#define HOST_COMMAND_ISP_BOOTDATA_21                            (0x4028)
-#define HOST_COMMAND_ISP_BOOTDATA_22                            (0x402A)
-#define HOST_COMMAND_ISP_BOOTDATA_23                            (0x402C)
-#define HOST_COMMAND_ISP_BOOTDATA_24                            (0x402E)
-#define HOST_COMMAND_ISP_BOOTDATA_25                            (0x4030)
-#define HOST_COMMAND_ISP_BOOTDATA_26                            (0x4032)
-#define HOST_COMMAND_ISP_BOOTDATA_27                            (0x4034)
-#define HOST_COMMAND_ISP_BOOTDATA_28                            (0x4036)
-#define HOST_COMMAND_ISP_BOOTDATA_29                            (0x4038)
-#define HOST_COMMAND_ISP_BOOTDATA_30                            (0x403A)
-#define HOST_COMMAND_ISP_BOOTDATA_31                            (0x403C)
-#define HOST_COMMAND_ISP_BOOTDATA_32                            (0x403E)
-#define HOST_COMMAND_ISP_BOOTDATA_33                            (0x4040)
-#define HOST_COMMAND_ISP_BOOTDATA_34                            (0x4042)
-#define HOST_COMMAND_ISP_BOOTDATA_35                            (0x4044)
-#define HOST_COMMAND_ISP_BOOTDATA_36                            (0x4046)
-#define HOST_COMMAND_ISP_BOOTDATA_37                            (0x4048)
-#define HOST_COMMAND_ISP_BOOTDATA_38                            (0x404A)
-#define HOST_COMMAND_ISP_BOOTDATA_39                            (0x404C)
-#define HOST_COMMAND_ISP_BOOTDATA_40                            (0x404E)
-#define HOST_COMMAND_ISP_BOOTDATA_41                            (0x4050)
-#define HOST_COMMAND_ISP_BOOTDATA_42                            (0x4052)
-#define HOST_COMMAND_ISP_BOOTDATA_43                            (0x4054)
-#define HOST_COMMAND_ISP_BOOTDATA_44                            (0x4056)
-#define HOST_COMMAND_ISP_BOOTDATA_45                            (0x4058)
-#define HOST_COMMAND_ISP_BOOTDATA_46                            (0x405A)
-#define HOST_COMMAND_ISP_BOOTDATA_47                            (0x405C)
-#define HOST_COMMAND_ISP_BOOTDATA_48                            (0x405E)
-#define HOST_COMMAND_ISP_BOOTDATA_49                            (0x4060)
-#define HOST_COMMAND_ISP_BOOTDATA_50                            (0x4062)
-#define HOST_COMMAND_ISP_BOOTDATA_51                            (0x4064)
-#define HOST_COMMAND_ISP_BOOTDATA_52                            (0x4066)
-#define HOST_COMMAND_ISP_BOOTDATA_53                            (0x4068)
-#define HOST_COMMAND_ISP_BOOTDATA_54                            (0x406A)
-#define HOST_COMMAND_ISP_BOOTDATA_55                            (0x406C)
-#define HOST_COMMAND_ISP_BOOTDATA_56                            (0x406E)
-#define HOST_COMMAND_ISP_BOOTDATA_57                            (0x4070)
-#define HOST_COMMAND_ISP_BOOTDATA_58                            (0x4072)
-#define HOST_COMMAND_ISP_BOOTDATA_59                            (0x4074)
-#define HOST_COMMAND_ISP_BOOTDATA_60                            (0x4076)
-#define HOST_COMMAND_ISP_BOOTDATA_61                            (0x4078)
-#define HOST_COMMAND_ISP_BOOTDATA_62                            (0x407A)
-#define HOST_COMMAND_ISP_BOOTDATA_63                            (0x407C)
+#define HOST_COMMAND_ISP_BOOTDATA_1								(0x4000)
+#define HOST_COMMAND_ISP_BOOTDATA_2								(0x4002)
+#define HOST_COMMAND_ISP_BOOTDATA_3								(0x4004)
+#define HOST_COMMAND_ISP_BOOTDATA_4								(0x4006)
+#define HOST_COMMAND_ISP_BOOTDATA_5								(0x4008)
+#define HOST_COMMAND_ISP_BOOTDATA_6								(0x400A)
+#define HOST_COMMAND_ISP_BOOTDATA_7								(0x400C)
+#define HOST_COMMAND_ISP_BOOTDATA_8								(0x400E)
+#define HOST_COMMAND_ISP_BOOTDATA_9								(0x4010)
+#define HOST_COMMAND_ISP_BOOTDATA_10							(0x4012)
+#define HOST_COMMAND_ISP_BOOTDATA_11							(0x4014)
+#define HOST_COMMAND_ISP_BOOTDATA_12							(0x4016)
+#define HOST_COMMAND_ISP_BOOTDATA_13							(0x4018)
+#define HOST_COMMAND_ISP_BOOTDATA_14							(0x401A)
+#define HOST_COMMAND_ISP_BOOTDATA_15							(0x401C)
+#define HOST_COMMAND_ISP_BOOTDATA_16							(0x401E)
+#define HOST_COMMAND_ISP_BOOTDATA_17							(0x4020)
+#define HOST_COMMAND_ISP_BOOTDATA_18							(0x4022)
+#define HOST_COMMAND_ISP_BOOTDATA_19							(0x4024)
+#define HOST_COMMAND_ISP_BOOTDATA_20							(0x4026)
+#define HOST_COMMAND_ISP_BOOTDATA_21							(0x4028)
+#define HOST_COMMAND_ISP_BOOTDATA_22							(0x402A)
+#define HOST_COMMAND_ISP_BOOTDATA_23							(0x402C)
+#define HOST_COMMAND_ISP_BOOTDATA_24							(0x402E)
+#define HOST_COMMAND_ISP_BOOTDATA_25							(0x4030)
+#define HOST_COMMAND_ISP_BOOTDATA_26							(0x4032)
+#define HOST_COMMAND_ISP_BOOTDATA_27							(0x4034)
+#define HOST_COMMAND_ISP_BOOTDATA_28							(0x4036)
+#define HOST_COMMAND_ISP_BOOTDATA_29							(0x4038)
+#define HOST_COMMAND_ISP_BOOTDATA_30							(0x403A)
+#define HOST_COMMAND_ISP_BOOTDATA_31							(0x403C)
+#define HOST_COMMAND_ISP_BOOTDATA_32							(0x403E)
+#define HOST_COMMAND_ISP_BOOTDATA_33							(0x4040)
+#define HOST_COMMAND_ISP_BOOTDATA_34							(0x4042)
+#define HOST_COMMAND_ISP_BOOTDATA_35							(0x4044)
+#define HOST_COMMAND_ISP_BOOTDATA_36							(0x4046)
+#define HOST_COMMAND_ISP_BOOTDATA_37							(0x4048)
+#define HOST_COMMAND_ISP_BOOTDATA_38							(0x404A)
+#define HOST_COMMAND_ISP_BOOTDATA_39							(0x404C)
+#define HOST_COMMAND_ISP_BOOTDATA_40							(0x404E)
+#define HOST_COMMAND_ISP_BOOTDATA_41							(0x4050)
+#define HOST_COMMAND_ISP_BOOTDATA_42							(0x4052)
+#define HOST_COMMAND_ISP_BOOTDATA_43							(0x4054)
+#define HOST_COMMAND_ISP_BOOTDATA_44							(0x4056)
+#define HOST_COMMAND_ISP_BOOTDATA_45							(0x4058)
+#define HOST_COMMAND_ISP_BOOTDATA_46							(0x405A)
+#define HOST_COMMAND_ISP_BOOTDATA_47							(0x405C)
+#define HOST_COMMAND_ISP_BOOTDATA_48							(0x405E)
+#define HOST_COMMAND_ISP_BOOTDATA_49							(0x4060)
+#define HOST_COMMAND_ISP_BOOTDATA_50							(0x4062)
+#define HOST_COMMAND_ISP_BOOTDATA_51							(0x4064)
+#define HOST_COMMAND_ISP_BOOTDATA_52							(0x4066)
+#define HOST_COMMAND_ISP_BOOTDATA_53							(0x4068)
+#define HOST_COMMAND_ISP_BOOTDATA_54							(0x406A)
+#define HOST_COMMAND_ISP_BOOTDATA_55							(0x406C)
+#define HOST_COMMAND_ISP_BOOTDATA_56							(0x406E)
+#define HOST_COMMAND_ISP_BOOTDATA_57							(0x4070)
+#define HOST_COMMAND_ISP_BOOTDATA_58							(0x4072)
+#define HOST_COMMAND_ISP_BOOTDATA_59							(0x4074)
+#define HOST_COMMAND_ISP_BOOTDATA_60							(0x4076)
+#define HOST_COMMAND_ISP_BOOTDATA_61							(0x4078)
+#define HOST_COMMAND_ISP_BOOTDATA_62							(0x407A)
+#define HOST_COMMAND_ISP_BOOTDATA_63							(0x407C)
 
 /* Define special method for controlling ISP with I2C */
-#define HOST_COMMAND_ISP_CTRL_I2C_ADDR                          (0xF000)
-#define HOST_COMMAND_ISP_CTRL_I2C_DATA                          (0xF002)
+#define HOST_COMMAND_ISP_CTRL_I2C_ADDR							(0xF000)
+#define HOST_COMMAND_ISP_CTRL_I2C_DATA							(0xF002)
 
 #define TEVS_BRIGHTNESS 						HOST_COMMAND_ISP_CTRL_BRIGHTNESS
 #define TEVS_BRIGHTNESS_MAX 					HOST_COMMAND_ISP_CTRL_BRIGHTNESS_MAX
@@ -201,9 +206,9 @@
 #define TEVS_FLICK_CTRL_MODE_DISABLED			(0U << 0)
 #define TEVS_FLICK_CTRL_MODE_MANUAL				(1U << 0)
 #define TEVS_FLICK_CTRL_MODE_AUTO				(2U << 0)
-#define TEVS_FLICK_CTRL_FREQ_MASK			    (0xFF00)
-#define TEVS_FLICK_CTRL_MODE_50HZ             	(TEVS_FLICK_CTRL_FREQ(50) | TEVS_FLICK_CTRL_MODE_MANUAL)
-#define TEVS_FLICK_CTRL_MODE_60HZ             	(TEVS_FLICK_CTRL_FREQ(60) | TEVS_FLICK_CTRL_MODE_MANUAL)
+#define TEVS_FLICK_CTRL_FREQ_MASK				(0xFF00)
+#define TEVS_FLICK_CTRL_MODE_50HZ				(TEVS_FLICK_CTRL_FREQ(50) | TEVS_FLICK_CTRL_MODE_MANUAL)
+#define TEVS_FLICK_CTRL_MODE_60HZ				(TEVS_FLICK_CTRL_FREQ(60) | TEVS_FLICK_CTRL_MODE_MANUAL)
 #define TEVS_AWB_MANUAL_TEMP 					HOST_COMMAND_ISP_CTRL_AWB_TEMP
 #define TEVS_AWB_MANUAL_TEMP_MAX 				HOST_COMMAND_ISP_CTRL_AWB_TEMP_MAX
 #define TEVS_AWB_MANUAL_TEMP_MIN 				HOST_COMMAND_ISP_CTRL_AWB_TEMP_MIN
@@ -245,7 +250,7 @@
 #define TEVS_DZ_CT_MASK 						(0xFFFF)
 #define TEVS_DZ_CT_MAX 							HOST_COMMAND_ISP_CTRL_CT_MAX
 #define TEVS_DZ_CT_MIN 							HOST_COMMAND_ISP_CTRL_CT_MIN
-#define TEVS_BSL_MODE_NORMAL_IDX 		    	(0U << 0)
+#define TEVS_BSL_MODE_NORMAL_IDX				(0U << 0)
 #define TEVS_BSL_MODE_FLASH_IDX 				(1U << 0)
 #define TEVS_MAX_FPS							HOST_COMMAND_ISP_CTRL_PREVIEW_MAX_FPS
 #define TEVS_MAX_FPS_MASK 						(0x00FF)
@@ -272,11 +277,14 @@
 #define V4L2_CID_TEVS_AE_EXP_TIME_MAX		(V4L2_CID_USER_TEVS_BASE + 4)
 #define V4L2_CID_TEVS_TRIGGER_MODE			(V4L2_CID_USER_TEVS_BASE + 5)
 
-#define DEFAULT_HEADER_VERSION 3
+#define DEFAULT_HEADER_VERSION 				3
 #define TEVS_BOOT_TIME						(250)
 #define TOTAL_MICROSEC_PERSEC				(1000000)
 
 #define TEVS_IMG_FORMAT_UYVY				(0x50)
+
+#define TEVS_LINK_FREQUENCY_DEFAULT			400000000ull
+#define TEVS_PIXEL_RATE_DEFAULT				200000000ull
 
 struct header_info {
 	u8 header_version;
@@ -311,6 +319,7 @@ struct tevs {
 	struct gpio_desc *reset_gpio;
 	struct gpio_desc *standby_gpio;
 
+    u16 chip_id;
 	int data_lanes;
 	int continuous_clock;
 	int data_frequency;
@@ -517,6 +526,22 @@ static int tevs_load_header_info(struct tevs *tevs)
 			header_ver);
 		return -EINVAL;
 	}
+}
+
+static int tevs_get_chip_id(struct tevs *tevs)
+{
+	struct device *dev = tevs->dev;
+    u16 val;
+    int ret = tevs_i2c_read_16b(tevs, HOST_COMMAND_TEVS_SENSOR_CHIP_ID, &val);
+
+    if (ret < 0) {
+        dev_err(dev, "Can't get chip ID. ret = %d.\n", ret);
+		return ret;
+	}
+
+    tevs->chip_id = val;
+    dev_info(dev, "Chip ID: 0x%.4X\n", tevs->chip_id);
+	return 0;
 }
 
 static int tevs_standby(struct tevs *tevs, int enable)
@@ -1999,64 +2024,44 @@ static int tevs_setup(struct tevs *tevs)
 	if (ret < 0) {
 		dev_err(tevs->dev, "otp flash init failed\n");
 		return -EINVAL;
+	}
+
+	ret = tevs_get_chip_id(tevs);
+	if (ret < 0) {
+		dev_err(tevs->dev, "get chip ID failed\n");
+		return -EINVAL;
+	}
+
+	if (tevs->chip_id == SENSOR_CHIP_ID_NONE) {
+		for (i = 0; i < ARRAY_SIZE(tevs_sensor_table); i++) {
+			if (strcmp((const char *)tevs->header_info->product_name,
+				tevs_sensor_table[i].sensor_name) == 0)
+				break;
+		}
 	} else {
 		for (i = 0; i < ARRAY_SIZE(tevs_sensor_table); i++) {
-			if (strcmp((const char *)tevs->header_info
-					   ->product_name,
-				   tevs_sensor_table[i].sensor_name) == 0)
+			if (tevs->chip_id == tevs_sensor_table[i].chip_id)
 				break;
 		}
 	}
 
 	if (i >= ARRAY_SIZE(tevs_sensor_table)) {
-		dev_err(tevs->dev, "cannot not support the product: %s\n",
-			(const char *)
-				tevs->header_info->product_name);
-		return -EINVAL;
+        if (tevs->chip_id == SENSOR_CHIP_ID_NONE)
+            dev_err(tevs->dev, "cannot not support the product: %s\n",
+				(const char *)tevs->header_info->product_name);
+        else
+            dev_err(tevs->dev, "cannot not support the chip ID: 0x%.4X\n",
+				tevs->chip_id);
+		return -ENODEV;
 	}
 
 	tevs->selected_sensor = i;
 	dev_dbg(tevs->dev, "selected_sensor:%d, sensor_name:%s\n", i,
 		tevs->header_info->product_name);
 
-	switch(tevs->selected_sensor){
-	case TEVS_AR0144:
-		tevs->s_data->frmfmt = ar0144_frmfmt;
-		tevs->s_data->numfmts = ARRAY_SIZE(ar0144_frmfmt);
-		break;
-	case TEVS_AR0145:
-		tevs->s_data->frmfmt = ar0145_frmfmt;
-		tevs->s_data->numfmts = ARRAY_SIZE(ar0145_frmfmt);
-		break;
-	case TEVS_AR0234:
-		tevs->s_data->frmfmt = ar0234_frmfmt;
-		tevs->s_data->numfmts = ARRAY_SIZE(ar0234_frmfmt);
-		break;
-	case TEVS_AR0521:
-		tevs->s_data->frmfmt = ar0521_frmfmt;
-		tevs->s_data->numfmts = ARRAY_SIZE(ar0521_frmfmt);
-		break;
-	case TEVS_AR0522:
-		tevs->s_data->frmfmt = ar0522_frmfmt;
-		tevs->s_data->numfmts = ARRAY_SIZE(ar0522_frmfmt);
-		break;
-	case TEVS_AR0821:
-		tevs->s_data->frmfmt = ar0821_frmfmt;
-		tevs->s_data->numfmts = ARRAY_SIZE(ar0821_frmfmt);
-		break;
-	case TEVS_AR0822:
-		tevs->s_data->frmfmt = ar0822_frmfmt;
-		tevs->s_data->numfmts = ARRAY_SIZE(ar0822_frmfmt);
-		break;
-	case TEVS_AR1335:
-		tevs->s_data->frmfmt = ar1335_frmfmt;
-		tevs->s_data->numfmts = ARRAY_SIZE(ar1335_frmfmt);
-		break;
-	default:
-		tevs->s_data->frmfmt = sensor_frmfmt;
-		tevs->s_data->numfmts = ARRAY_SIZE(sensor_frmfmt);
-		break;
-	}
+	tevs->s_data->frmfmt = tevs_sensor_table[tevs->selected_sensor].frmfmt;
+	tevs->s_data->numfmts =
+			tevs_sensor_table[tevs->selected_sensor].res_list_size;
 
 	if ((ret = tevs_init_setting(tevs)) != 0) {
 		dev_err(tevs->dev, "init setting failed\n");
