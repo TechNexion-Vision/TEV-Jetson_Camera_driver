@@ -1693,6 +1693,22 @@ static int max96716a_reset(struct max96716a_priv *priv)
 				"Failed waiting for deserializer with new or old address: %d\n", ret);
 			goto err_regmap_exit;
 		}
+
+		ret = regmap_write(regmap, 0x0, priv->client->addr << 1);
+		if (ret) {
+			dev_err(priv->dev, "Failed to change deserializer address: %d\n", ret);
+			goto err_regmap_exit;
+		}
+
+		dev_info(priv->dev, "change addr to 0x%x\n", client->addr);
+		regmap_update_bits(priv->regmap, 0x5b, GENMASK(2, 0), priv->source_id);
+		regmap_update_bits(priv->regmap, 0x63, GENMASK(2, 0), priv->source_id);
+		regmap_update_bits(priv->regmap, 0x6b, GENMASK(2, 0), priv->source_id);
+		regmap_update_bits(priv->regmap, 0x73, GENMASK(2, 0), priv->source_id);
+		regmap_update_bits(priv->regmap, 0x7b, GENMASK(2, 0), priv->source_id);
+		regmap_update_bits(priv->regmap, 0x83, GENMASK(2, 0), priv->source_id);
+		regmap_update_bits(priv->regmap, 0x8b, GENMASK(2, 0), priv->source_id);
+
 err_regmap_exit:
 		regmap_exit(regmap);
 
@@ -1718,54 +1734,6 @@ err_unregister_client:
 			return ret;
 		}
 	}
-
-	return ret;
-}
-
-static int max96716a_change_address(struct max96716a_priv *priv)
-{
-	struct i2c_client *client;
-	struct regmap *regmap;
-	int ret;
-
-	dev_dbg(priv->dev, "%s()\n", __func__);
-
-	client = i2c_new_dummy_device(priv->client->adapter, priv->i2c_addr);
-	if (IS_ERR(client)) {
-		ret = PTR_ERR(client);
-		dev_err(priv->dev,
-			"Failed to create I2C client: %d\n", ret);
-		return ret;
-	}
-
-	regmap = regmap_init_i2c(client, &max_des_i2c_regmap);
-	if (IS_ERR(regmap)) {
-		ret = PTR_ERR(regmap);
-		dev_err(priv->dev,
-			"Failed to create I2C regmap: %d\n", ret);
-		goto err_unregister_client;
-	}
-
-	ret = regmap_write(regmap, 0x0, priv->client->addr << 1);
-	if (ret) {
-		dev_err(priv->dev, "Failed to change deserializer address: %d\n", ret);
-		goto err_regmap_exit;
-	}
-
-	dev_info(priv->dev, "change addr to 0x%x\n", client->addr);
-	regmap_update_bits(priv->regmap, 0x5b, GENMASK(2, 0), priv->source_id);
-	regmap_update_bits(priv->regmap, 0x63, GENMASK(2, 0), priv->source_id);
-	regmap_update_bits(priv->regmap, 0x6b, GENMASK(2, 0), priv->source_id);
-	regmap_update_bits(priv->regmap, 0x73, GENMASK(2, 0), priv->source_id);
-	regmap_update_bits(priv->regmap, 0x7b, GENMASK(2, 0), priv->source_id);
-	regmap_update_bits(priv->regmap, 0x83, GENMASK(2, 0), priv->source_id);
-	regmap_update_bits(priv->regmap, 0x8b, GENMASK(2, 0), priv->source_id);
-
-err_regmap_exit:
-	regmap_exit(regmap);
-
-err_unregister_client:
-	i2c_unregister_device(client);
 
 	return ret;
 }
@@ -2455,12 +2423,6 @@ static int max96716a_probe(struct i2c_client *client)
 	ret = max96716a_reset(priv);
 	if (ret)
 		return ret;
-
-	if (priv->i2c_addr != priv->client->addr) {
-		ret = max96716a_change_address(priv);
-		if (ret)
-			return ret;
-	}
 
 	/* Disable link auto-select and set splitter mode */
 	ret = max96716a_write(priv, 0x10, 0x23);
