@@ -1857,6 +1857,31 @@ static int max96724_reset(struct max96724_priv *priv)
 				"Failed waiting for deserializer with new or old address: %d\n", ret);
 			goto err_regmap_exit;
 		}
+
+		ret = regmap_write(regmap, 0x0, priv->client->addr << 1);
+		if (ret) {
+			dev_err(priv->dev, "Failed to change deserializer address: %d\n", ret);
+			goto err_regmap_exit;
+		}
+
+		dev_info(priv->dev, "change addr to 0x%x\n", client->addr);
+		regmap_update_bits(priv->regmap, 0x72, GENMASK(2, 0), priv->source_id);
+		regmap_update_bits(priv->regmap, 0x76, GENMASK(2, 0), priv->source_id);
+		regmap_update_bits(priv->regmap, 0x7a, GENMASK(2, 0), priv->source_id);
+		regmap_update_bits(priv->regmap, 0x7e, GENMASK(2, 0), priv->source_id);
+		regmap_update_bits(priv->regmap, 0xa3, GENMASK(2, 0), priv->source_id);
+		regmap_update_bits(priv->regmap, 0xab, GENMASK(2, 0), priv->source_id);
+		regmap_update_bits(priv->regmap, 0xb3, GENMASK(2, 0), priv->source_id);
+		regmap_update_bits(priv->regmap, 0xbb, GENMASK(2, 0), priv->source_id);
+		regmap_update_bits(priv->regmap, 0x503, GENMASK(2, 0), priv->source_id);
+		regmap_update_bits(priv->regmap, 0x513, GENMASK(2, 0), priv->source_id);
+		regmap_update_bits(priv->regmap, 0x523, GENMASK(2, 0), priv->source_id);
+		regmap_update_bits(priv->regmap, 0x533, GENMASK(2, 0), priv->source_id);
+		regmap_update_bits(priv->regmap, 0x563, GENMASK(2, 0), priv->source_id);
+		regmap_update_bits(priv->regmap, 0x573, GENMASK(2, 0), priv->source_id);
+		regmap_update_bits(priv->regmap, 0x583, GENMASK(2, 0), priv->source_id);
+		regmap_update_bits(priv->regmap, 0x593, GENMASK(2, 0), priv->source_id);
+
 err_regmap_exit:
 		regmap_exit(regmap);
 
@@ -1882,63 +1907,6 @@ err_unregister_client:
 			return ret;
 		}
 	}
-
-	return ret;
-}
-
-static int max96724_change_address(struct max96724_priv *priv)
-{
-	struct i2c_client *client;
-	struct regmap *regmap;
-	int ret;
-
-	dev_dbg(priv->dev, "%s()\n", __func__);
-
-	client = i2c_new_dummy_device(priv->client->adapter, priv->i2c_addr);
-	if (IS_ERR(client)) {
-		ret = PTR_ERR(client);
-		dev_err(priv->dev,
-			"Failed to create I2C client: %d\n", ret);
-		return ret;
-	}
-
-	regmap = regmap_init_i2c(client, &max_des_i2c_regmap);
-	if (IS_ERR(regmap)) {
-		ret = PTR_ERR(regmap);
-		dev_err(priv->dev,
-			"Failed to create I2C regmap: %d\n", ret);
-		goto err_unregister_client;
-	}
-
-	ret = regmap_write(regmap, 0x0, priv->client->addr << 1);
-	if (ret) {
-		dev_err(priv->dev, "Failed to change deserializer address: %d\n", ret);
-		goto err_regmap_exit;
-	}
-
-	dev_info(priv->dev, "change addr to 0x%x\n", client->addr);
-	regmap_update_bits(priv->regmap, 0x72, GENMASK(2, 0), priv->source_id);
-	regmap_update_bits(priv->regmap, 0x76, GENMASK(2, 0), priv->source_id);
-	regmap_update_bits(priv->regmap, 0x7a, GENMASK(2, 0), priv->source_id);
-	regmap_update_bits(priv->regmap, 0x7e, GENMASK(2, 0), priv->source_id);
-	regmap_update_bits(priv->regmap, 0xa3, GENMASK(2, 0), priv->source_id);
-	regmap_update_bits(priv->regmap, 0xab, GENMASK(2, 0), priv->source_id);
-	regmap_update_bits(priv->regmap, 0xb3, GENMASK(2, 0), priv->source_id);
-	regmap_update_bits(priv->regmap, 0xbb, GENMASK(2, 0), priv->source_id);
-	regmap_update_bits(priv->regmap, 0x503, GENMASK(2, 0), priv->source_id);
-	regmap_update_bits(priv->regmap, 0x513, GENMASK(2, 0), priv->source_id);
-	regmap_update_bits(priv->regmap, 0x523, GENMASK(2, 0), priv->source_id);
-	regmap_update_bits(priv->regmap, 0x533, GENMASK(2, 0), priv->source_id);
-	regmap_update_bits(priv->regmap, 0x563, GENMASK(2, 0), priv->source_id);
-	regmap_update_bits(priv->regmap, 0x573, GENMASK(2, 0), priv->source_id);
-	regmap_update_bits(priv->regmap, 0x583, GENMASK(2, 0), priv->source_id);
-	regmap_update_bits(priv->regmap, 0x593, GENMASK(2, 0), priv->source_id);
-
-err_regmap_exit:
-	regmap_exit(regmap);
-
-err_unregister_client:
-	i2c_unregister_device(client);
 
 	return ret;
 }
@@ -2690,12 +2658,6 @@ static int max96724_probe(struct i2c_client *client)
 	ret = max96724_reset(priv);
 	if (ret)
 		return ret;
-
-	if (priv->i2c_addr != priv->client->addr) {
-		ret = max96724_change_address(priv);
-		if (ret)
-			return ret;
-	}
 
 	return max_des_probe(&priv->des_priv);
 }
