@@ -613,14 +613,6 @@ static int tevs_check_boot_state(struct tevs *tevs)
  * V4L2 Controls
  */
 
-static s64 tevs_link_freqs[] = {
-	400000000
-};
-
-static const u32 tevs_pixel_rates[] = {
-	200000000,
-};
-
 static const char *const awb_mode_strings[] = {
 	"Manual Temp Mode", // TEVS_AWB_CTRL_MODE_MANUAL_TEMP
 	"Auto Mode", // TEVS_AWB_CTRL_MODE_AUTO
@@ -1226,6 +1218,12 @@ static int tevs_ctrls_init(struct tevs *tevs)
 	s64 ctrl_def, ctrl_max, ctrl_min;
 	u8 exp[4] = { 0 };
 	int ret;
+	static s64 link_freq[] = {
+		TEVS_LINK_FREQUENCY_DEFAULT,
+	};
+	static s64 pixel_rate[] = {
+		TEVS_PIXEL_RATE_DEFAULT,
+	};
 
 	ctrl_hdl = tevs->s_data->tegracam_ctrl_hdl;
 
@@ -1498,15 +1496,18 @@ static int tevs_ctrls_init(struct tevs *tevs)
 				       ctrl_max, 1, ctrl_def);
 
 	/* By default, link_freq and pixel_rate is read only */
+	link_freq[0] = (u64)(tevs->data_frequency >> 1) * 1000000ULL;
 	tevs->link_freq = v4l2_ctrl_new_int_menu(
 		&ctrl_hdl->ctrl_handler, &tevs_ctrl_ops, V4L2_CID_LINK_FREQ,
-		ARRAY_SIZE(tevs_link_freqs) - 1, 0, tevs_link_freqs);
+		ARRAY_SIZE(link_freq) - 1, 0, link_freq);
 	tevs->link_freq->flags |= V4L2_CTRL_FLAG_READ_ONLY;
 
+	/* link_freq = (pixel_rate * bpp) / (2 * data_lanes) */
+	pixel_rate[0] = link_freq[0] * (2 * tevs->data_lanes) / 16;
 	tevs->pixel_rate =
 		v4l2_ctrl_new_std(&ctrl_hdl->ctrl_handler, &tevs_ctrl_ops,
-				  V4L2_CID_PIXEL_RATE, tevs_pixel_rates[0],
-				  tevs_pixel_rates[0], 1, tevs_pixel_rates[0]);
+				  V4L2_CID_PIXEL_RATE, pixel_rate[0],
+				  pixel_rate[0], 1, pixel_rate[0]);
 	tevs->pixel_rate->flags |= V4L2_CTRL_FLAG_READ_ONLY;
 
 	tevs->bsl = v4l2_ctrl_new_custom(&ctrl_hdl->ctrl_handler, &tevs_bsl_mode, NULL);
@@ -1900,6 +1901,13 @@ static int tevs_setup(struct tevs *tevs)
 {
 	int i = 0;
 	int ret = 0;
+	struct device_node *endpoint = NULL;
+	struct device_node *ports;
+	struct device_node *port;
+	struct fwnode_handle *ep;
+	struct v4l2_fwnode_endpoint ep_cfg = {
+		.bus_type = V4L2_MBUS_CSI2_DPHY
+	};
 
 	tevs->reset_gpio =
 		devm_gpiod_get_optional(tevs->dev, "reset", GPIOD_OUT_LOW);
@@ -1923,38 +1931,38 @@ static int tevs_setup(struct tevs *tevs)
 		return ret;
 	}
 
-	tevs->data_lanes = 4;
-	if (of_property_read_u32(tevs->dev->of_node, "data-lanes", &tevs->data_lanes) ==
-	    0) {
-		if ((tevs->data_lanes < 1) || (tevs->data_lanes > 4)) {
-			dev_err(tevs->dev,
-				"value of 'data-lanes' property is invaild\n");
-			tevs->data_lanes = 4;
-		}
-	}
+	// tevs->data_lanes = 4;
+	// if (of_property_read_u32(tevs->dev->of_node, "data-lanes", &tevs->data_lanes) ==
+	//     0) {
+	// 	if ((tevs->data_lanes < 1) || (tevs->data_lanes > 4)) {
+	// 		dev_err(tevs->dev,
+	// 			"value of 'data-lanes' property is invaild\n");
+	// 		tevs->data_lanes = 4;
+	// 	}
+	// }
 
-	tevs->continuous_clock = 0;
-	if (of_property_read_u32(tevs->dev->of_node, "continuous-clock",
-				 &tevs->continuous_clock) == 0) {
-		if (tevs->continuous_clock > 1) {
-			dev_err(tevs->dev,
-				"value of 'continuous-clock' property is invaild\n");
-			tevs->continuous_clock = 0;
-		}
-	}
+	// tevs->continuous_clock = 0;
+	// if (of_property_read_u32(tevs->dev->of_node, "continuous-clock",
+	// 			 &tevs->continuous_clock) == 0) {
+	// 	if (tevs->continuous_clock > 1) {
+	// 		dev_err(tevs->dev,
+	// 			"value of 'continuous-clock' property is invaild\n");
+	// 		tevs->continuous_clock = 0;
+	// 	}
+	// }
 
-	tevs->data_frequency = 0;
-	if (of_property_read_u32(tevs->dev->of_node, "data-frequency",
-				 &tevs->data_frequency) == 0) {
-		if ((tevs->data_frequency != 0) &&
-		    ((tevs->data_frequency < 100) ||
-		     (tevs->data_frequency > 1200))) {
-			dev_err(tevs->dev,
-				"value of 'data-frequency = <%d>' property is invaild\n",
-				tevs->data_frequency);
-			return -EINVAL;
-		}
-	}
+	// tevs->data_frequency = 0;
+	// if (of_property_read_u32(tevs->dev->of_node, "data-frequency",
+	// 			 &tevs->data_frequency) == 0) {
+	// 	if ((tevs->data_frequency != 0) &&
+	// 	    ((tevs->data_frequency < 100) ||
+	// 	     (tevs->data_frequency > 1200))) {
+	// 		dev_err(tevs->dev,
+	// 			"value of 'data-frequency = <%d>' property is invaild\n",
+	// 			tevs->data_frequency);
+	// 		return -EINVAL;
+	// 	}
+	// }
 
 	tevs->vc_id = 0;
 	if (of_property_read_u32(tevs->dev->of_node, "vc-id",
@@ -1980,6 +1988,68 @@ static int tevs_setup(struct tevs *tevs)
 			return -EINVAL;
 		}
 	}
+
+	ports = of_get_child_by_name(tevs->dev->of_node, "ports");
+	if (ports == NULL)
+		ports = tevs->dev->of_node;
+
+	for_each_child_of_node(ports, port) {
+		if (!port->name || of_node_cmp(port->name, "port"))
+			continue;
+
+		for_each_child_of_node(port, endpoint) {
+			if (!endpoint->name || of_node_cmp(endpoint->name, "endpoint"))
+				continue;
+			ret = of_property_read_u32(endpoint, "bus-width", &tevs->data_lanes);
+			if (ret < 0)
+				dev_err(tevs->dev, "No bus width info\n");
+		}
+	}
+
+	/* Check the number of MIPI CSI2 data lanes */
+	if (tevs->data_lanes != 2 && tevs->data_lanes != 4) {
+		dev_err(tevs->dev, "only 2 or 4 data lanes are currently supported\n");
+		ret = -EINVAL;
+		goto error_out;
+	}
+
+	ep = fwnode_graph_get_endpoint_by_id(dev_fwnode(tevs->dev), 0, 0,
+					     FWNODE_GRAPH_ENDPOINT_NEXT);
+	if (!ep) {
+		dev_err(tevs->dev, "no sink port found");
+		return -EINVAL;
+	}
+
+	ret = v4l2_fwnode_endpoint_alloc_parse(ep, &ep_cfg);
+	if (ret < 0) {
+		dev_err(tevs->dev, "failed to parse bus configuration\n");
+		goto error_out;
+	}
+
+	/* Check the link frequency set in device tree */
+	if (ep_cfg.nr_of_link_frequencies == 0)
+		tevs->data_frequency = div_u64(((u64)TEVS_LINK_FREQUENCY_DEFAULT * 2),
+							1000000ULL);
+	else if (ep_cfg.nr_of_link_frequencies == 1)
+		tevs->data_frequency = div_u64((ep_cfg.link_frequencies[0] * 2),
+							1000000ULL);
+	else {
+		dev_err(tevs->dev, "invalid link frequencies %u on port\n",
+				ep_cfg.nr_of_link_frequencies);
+		ret = -EINVAL;
+		goto error_out;
+	}
+
+	if ((tevs->data_frequency != 0) &&
+		((tevs->data_frequency < 100) || (tevs->data_frequency > 1200))) {
+		dev_err(tevs->dev,
+			"value of data-frequency [%d] is invaild\n",
+			tevs->data_frequency);
+		ret = -EINVAL;
+		goto error_out;
+	}
+
+	tevs->continuous_clock = ~(ep_cfg.bus.mipi_csi2.flags) & V4L2_MBUS_CSI2_NONCONTINUOUS_CLOCK;
 
 	dev_dbg(tevs->dev,
 		"data-lanes [%d] ,continuous-clock [%d],"
@@ -2068,6 +2138,10 @@ static int tevs_setup(struct tevs *tevs)
 		return ret;
 	}
 
+error_out:
+	v4l2_fwnode_endpoint_free(&ep_cfg);
+	fwnode_handle_put(ep);
+
 	return ret;
 }
 
@@ -2127,9 +2201,6 @@ static int tevs_probe(struct i2c_client *client,
 		dev_err(dev, "tegra camera subdev registration failed\n");
 		return ret;
 	}
-
-	/* link_freq = (pixel_rate * bpp) / (2 * data_lanes) */
-	tevs_link_freqs[0] = (tevs_pixel_rates[0] * 16) / (2 * tevs->data_lanes);
 
 	ret = tevs_ctrls_init(tevs);
 	if (ret) {
