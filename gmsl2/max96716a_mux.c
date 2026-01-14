@@ -199,8 +199,6 @@ static int max_des_i2c_mux_init(struct max_des_priv *priv)
 		if (!link->enabled)
 			continue;
 
-		priv->ops->select_links(priv, BIT(link->index));
-
 		ret = i2c_mux_add_adapter(priv->mux, 0, link->index, 0);
 		dev_info(priv->dev, "%s() link [%d]\n", __func__, link->index);
 		if (ret)
@@ -1760,12 +1758,84 @@ static int max96716a_mipi_enable(struct max_des_priv *des_priv, bool enable)
 	return 0;
 }
 
+static int max96716a_check_gmsl_links(struct max_des_priv *des_priv)
+{
+	struct max96716a_priv *priv = des_to_priv(des_priv);
+	unsigned int locked_links_mask = 0;
+	unsigned int links_mask = des_priv->gmsl_link_mask;
+	u16 link_lock_addr[2] = {
+		0x13,
+		0x5009
+	};
+	unsigned long timeout;
+
+	dev_dbg(priv->dev, "%s()\n", __func__);
+
+	max96716a_update_bits(priv, 0x10,
+					BIT(5) | GENMASK(1, 0),
+					BIT(5) | FIELD_PREP(GENMASK(1, 0), des_priv->gmsl_link_mask));
+	max96716a_update_bits(priv, 0x12, BIT(5), BIT(5));
+
+	timeout = jiffies + msecs_to_jiffies(100);
+
+	while (!time_after(jiffies, timeout)) {
+		int current_link = ffs(links_mask) - 1;
+
+		if (current_link == -1)
+			break;
+
+		des_priv->pipes[current_link].enabled = false;
+		if ((max96716a_read(priv, link_lock_addr[current_link]) & BIT(3)) == BIT(3)) {
+			locked_links_mask |= BIT(current_link);
+			des_priv->pipes[current_link].enabled = true;
+		}
+
+		links_mask &= ~BIT(current_link);
+
+		if (!links_mask && des_priv->gmsl_link_mask == locked_links_mask)
+			break;
+		else if (!links_mask)
+			links_mask = des_priv->gmsl_link_mask & ~locked_links_mask;
+
+		usleep_range(1000, 2000);
+	}
+
+	return locked_links_mask;
+}
+
 static int max96716a_init(struct max_des_priv *des_priv)
 {
 	struct max96716a_priv *priv = des_to_priv(des_priv);
+	unsigned int locked_links;
+	int retries = 3;
 	int ret;
 
 	dev_dbg(priv->dev, "%s()\n", __func__);
+
+	while (retries--) {
+		locked_links = max96716a_check_gmsl_links(des_priv);
+		if (locked_links == des_priv->gmsl_link_mask)
+			break;
+
+		max96716a_reset(priv);
+		usleep_range(2000, 2500);
+	}
+
+	if (locked_links == 0) {
+		dev_err(priv->dev, "No GMSL link has locked after 3 retries. Abort!\n");
+		return -ENODEV;
+	}
+
+	dev_info(priv->dev, "GMSL link has locked - mask [0x%x]\n", locked_links);
+
+	des_priv->ops->select_links(des_priv, locked_links);
+	ret = max96716a_update_bits(priv, 0x10,
+					BIT(5) | GENMASK(1, 0),
+					BIT(5) | FIELD_PREP(GENMASK(1, 0), locked_links));
+	ret += max96716a_update_bits(priv, 0x12, BIT(5), BIT(5));
+	if (ret)
+		return ret;
+	msleep(65);
 
 	/* Disable all PHYs. */
 	ret = max96716a_update_bits(priv, 0x332, GENMASK(7, 4), 0x00);
@@ -1798,6 +1868,7 @@ static int max96716a_init(struct max_des_priv *des_priv)
 
 	/* Reset one shot */
 	ret = max96716a_update_bits(priv, 0x10, BIT(5), BIT(5));
+	ret += max96716a_update_bits(priv, 0x12, BIT(5), BIT(5));
 	if (ret)
 		return ret;
 	msleep(65);
@@ -2179,7 +2250,6 @@ static int max96716a_init_link(struct max_des_priv *des_priv,
 			return ret;
 
 		ret = max96716a_update_bits(priv, 0x10, BIT(5), BIT(5));
-
 		ret += max96716a_update_bits(priv, 0x12, BIT(5), BIT(5));
 		if (ret)
 			return ret;
@@ -2299,21 +2369,11 @@ static int max96716a_select_links(struct max_des_priv *des_priv,
 		dev_warn(priv->dev, "All links are disabled\n");
 	}
 
-	if (mask == 0x01) {
-		ret += max96716a_update_bits(priv, 0x01, BIT(4), 0x00);
-		ret += max96716a_update_bits(priv, 0x03, BIT(2), BIT(2));
-	}
-	else if (mask == 0x02) {
-		ret += max96716a_update_bits(priv, 0x01, BIT(4), BIT(4));
-		ret += max96716a_update_bits(priv, 0x03, BIT(2), 0x00);
-	}
-	else if (mask == 0x03) {
-		ret += max96716a_update_bits(priv, 0x01, BIT(4), 0x00);
-		ret += max96716a_update_bits(priv, 0x03, BIT(2), 0x00);
-	}
+	ret += max96716a_update_bits(priv, 0x01, BIT(4), mask & 0x01 ? 0x00 : BIT(4));
+	ret += max96716a_update_bits(priv, 0x03, BIT(2), mask & 0x02 ? 0x00 : BIT(2));
 
 	/* delay to settle link */
-	msleep(100);
+	msleep(65);
 
 	return ret;
 }
@@ -2338,7 +2398,7 @@ static int max96716a_post_init(struct max_des_priv *des_priv)
 			return -EINVAL;
 	}
 
-	return 0;
+	return ret;
 }
 
 static const struct max_des_ops max96716a_ops = {
@@ -2426,19 +2486,15 @@ static int max96716a_probe(struct i2c_client *client)
 	if (ret)
 		return ret;
 
-	/* Disable link auto-select and set splitter mode */
-	ret = max96716a_write(priv, 0x10, 0x23);
-	if (ret)
-		return ret;
-
 	/* Focus to pixel mode */
 	ret = max96716a_update_bits(priv, 0x474, BIT(0), 0x00);
 	ret += max96716a_update_bits(priv, 0x4b4, BIT(0), 0x00);
 	if (ret)
 		return ret;
 
-	/* Reset one shot */
-	ret = max96716a_update_bits(priv, 0x10, BIT(5), BIT(5));
+	/* Disable link auto-select and set splitter mode */
+	ret = max96716a_write(priv, 0x10, 0x23);
+	ret += max96716a_update_bits(priv, 0x12, BIT(5), BIT(5));
 	if (ret)
 		return ret;
 	msleep(65);
