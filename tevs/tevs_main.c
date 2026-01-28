@@ -603,7 +603,7 @@ static int tevs_check_boot_state(struct tevs *tevs)
 			dev_err(tevs->dev, "tevs bootup timeout: state: 0x%02X\n", boot_state);
 			ret = -EINVAL;
 		}
-		msleep(20);
+		msleep(50);
 	}
 
 	return ret;
