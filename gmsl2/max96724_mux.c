@@ -2491,6 +2491,28 @@ static int max96724_init_pipe(struct max_des_priv *des_priv,
 	return 0;
 }
 
+static int max96724_init_link(struct max_des_priv *des_priv,
+				  struct max_des_link *link)
+{
+	struct max96724_priv *priv = des_to_priv(des_priv);
+	unsigned int index = link->index;
+	int ret;
+
+	dev_dbg(priv->dev, "%s()\n", __func__);
+
+	/* RLMS Register Setting for robust 6Gbps GMSL2 Rate */
+	ret = max96724_write(priv, 0x1449 + 0x100 * index, 0x75);
+	if (ret)
+		return ret;
+
+	ret = max96724_update_bits(priv, 0x18, 0x0f, 0x0f);
+	if (ret)
+		return ret;
+	msleep(60);
+
+	return 0;
+}
+
 static int max96724_init_fsync(struct max_des_priv *des_priv,
 				  struct max_des_fsync *fsync)
 {
@@ -2602,6 +2624,7 @@ static const struct max_des_ops max96724_ops = {
 	.init = max96724_init,
 	.init_phy = max96724_init_phy,
 	.init_pipe = max96724_init_pipe,
+	.init_link = max96724_init_link,
 	.init_fsync = max96724_init_fsync,
 	.update_pipe_remaps = max96724_update_pipe_remaps,
 	.select_links = max96724_select_links,
