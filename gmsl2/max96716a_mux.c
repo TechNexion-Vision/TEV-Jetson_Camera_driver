@@ -2208,35 +2208,85 @@ static int max96716a_init_link(struct max_des_priv *des_priv,
 
 	dev_dbg(priv->dev, "%s()\n", __func__);
 
-	// /* RLMS Register Setting for 6Gbps GMSL2 Rate */
-	// ret = max96716a_write(priv, 0x143f + 0x100 * index, 0x3d);
-	// if (ret)
-	// 	return ret;
+	/* RLMS Register Setting for robust 6Gbps GMSL2 Rate */
+	ret = max96716a_write(priv, 0x143f + 0x100 * index, 0x3d);
+	if (ret)
+		return ret;
 
-	// ret = max96716a_write(priv, 0x143e + 0x100 * index, 0xfd);
-	// if (ret)
-	// 	return ret;
+	ret = max96716a_write(priv, 0x143e + 0x100 * index, 0xfd);
+	if (ret)
+		return ret;
 
-	// ret = max96716a_write(priv, 0x1449 + 0x100 * index, 0xf5);
-	// if (ret)
-	// 	return ret;
+	ret = max96716a_write(priv, 0x14ad + 0x100 * index, 0x68);
+	if (ret)
+		return ret;
 
-	// ret = max96716a_write(priv, 0x14a3 + 0x100 * index, 0x30);
-	// if (ret)
-	// 	return ret;
+	ret = max96716a_write(priv, 0x14ac + 0x100 * index, 0xa8);
+	if (ret)
+		return ret;
 
-	// ret = max96716a_write(priv, 0x14d8 + 0x100 * index, 0x07);
-	// if (ret)
-	// 	return ret;
+	ret = max96716a_write(priv, 0x1418 + 0x100 * index, 0x07);
+	if (ret)
+		return ret;
 
-	// ret = max96716a_write(priv, 0x14a5 + 0x100 * index, 0x70);
-	// if (ret)
-	// 	return ret;
+	ret = max96716a_write(priv, 0x141f + 0x100 * index, 0xc2);
+	if (ret)
+		return ret;
 
-	// ret = max96716a_update_bits(priv, 0x10, BIT(5), BIT(5));
-	// if (ret)
-	// 	return ret;
-	// msleep(65);
+	ret = max96716a_write(priv, 0x148c + 0x100 * index, 0x20);
+	if (ret)
+		return ret;
+
+	ret = max96716a_write(priv, 0x1498 + 0x100 * index, 0xc0);
+	if (ret)
+		return ret;
+
+	ret = max96716a_write(priv, 0x1446 + 0x100 * index, 0x01);
+	if (ret)
+		return ret;
+
+	ret = max96716a_write(priv, 0x1445 + 0x100 * index, 0x81);
+	if (ret)
+		return ret;
+
+	ret = max96716a_write(priv, 0x140b + 0x100 * index, 0x44);
+	if (ret)
+		return ret;
+
+	ret = max96716a_write(priv, 0x140a + 0x100 * index, 0x08);
+	if (ret)
+		return ret;
+
+	ret = max96716a_write(priv, 0x1431 + 0x100 * index, 0x18);
+	if (ret)
+		return ret;
+
+	ret = max96716a_write(priv, 0x1421 + 0x100 * index, 0x08);
+	if (ret)
+		return ret;
+
+	ret = max96716a_write(priv, 0x14a5 + 0x100 * index, 0x70);
+	if (ret)
+		return ret;
+
+	ret = max96716a_write(priv, 0x1449 + 0x100 * index, 0xf5);
+	if (ret)
+		return ret;
+
+	/* RLMS Register Setting for long 6Gbps GMSL2 Rate */
+	ret = max96716a_write(priv, 0x141f + 0x100 * index, 0x8c);
+	if (ret)
+		return ret;
+
+	ret = max96716a_write(priv, 0x1423 + 0x100 * index, 0x58);
+	if (ret)
+		return ret;
+
+	ret = max96716a_update_bits(priv, 0x10, BIT(5), BIT(5));
+	ret += max96716a_update_bits(priv, 0x12, BIT(5), BIT(5));
+	if (ret)
+		return ret;
+	msleep(65);
 
 	if (priv->info->supports_tunnel_mode) {
 		mask = BIT(0);
