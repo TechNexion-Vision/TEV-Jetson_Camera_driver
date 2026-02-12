@@ -884,12 +884,11 @@ static int tevs_set_bsl_mode(struct tevs *tevs, s32 mode)
 		usleep_range(9000, 10000);
 		gpiod_set_value_cansleep(tevs->reset_gpio, 1);
 		usleep_range(9000, 10000);
-		msleep(400);
 
 		msleep(TEVS_BOOT_TIME);
 
 		if (tevs_check_boot_state(tevs) != 0) {
-			dev_err(tevs->dev, "check tevs bootup status failed\n");
+			dev_err(tevs->dev, "check tevs bootup status failed before change data frequency\n");
 			return -EINVAL;
 		}
 
@@ -903,7 +902,7 @@ static int tevs_set_bsl_mode(struct tevs *tevs, s32 mode)
 				msleep(TEVS_BOOT_TIME);
 				if (tevs_check_boot_state(tevs) != 0) {
 					dev_err(tevs->dev,
-						"check tevs bootup status failed\n");
+						"check tevs bootup status failed after change data frequency\n");
 					return -EINVAL;
 				}
 			}
@@ -1640,6 +1639,7 @@ static int tevs_power_off(struct camera_common_data *s_data)
 
 	if (tevs->hw_reset_mode) {
 		gpiod_set_value_cansleep(tevs->reset_gpio, 0);
+		gpiod_set_value_cansleep(tevs->standby_gpio, 0);
 	}
 
 	return 0;
@@ -1929,39 +1929,7 @@ static int tevs_setup(struct tevs *tevs)
 		}
 		return ret;
 	}
-
-	// tevs->data_lanes = 4;
-	// if (of_property_read_u32(tevs->dev->of_node, "data-lanes", &tevs->data_lanes) ==
-	//     0) {
-	// 	if ((tevs->data_lanes < 1) || (tevs->data_lanes > 4)) {
-	// 		dev_err(tevs->dev,
-	// 			"value of 'data-lanes' property is invaild\n");
-	// 		tevs->data_lanes = 4;
-	// 	}
-	// }
-
-	// tevs->continuous_clock = 0;
-	// if (of_property_read_u32(tevs->dev->of_node, "continuous-clock",
-	// 			 &tevs->continuous_clock) == 0) {
-	// 	if (tevs->continuous_clock > 1) {
-	// 		dev_err(tevs->dev,
-	// 			"value of 'continuous-clock' property is invaild\n");
-	// 		tevs->continuous_clock = 0;
-	// 	}
-	// }
-
-	// tevs->data_frequency = 0;
-	// if (of_property_read_u32(tevs->dev->of_node, "data-frequency",
-	// 			 &tevs->data_frequency) == 0) {
-	// 	if ((tevs->data_frequency != 0) &&
-	// 	    ((tevs->data_frequency < 100) ||
-	// 	     (tevs->data_frequency > 1200))) {
-	// 		dev_err(tevs->dev,
-	// 			"value of 'data-frequency = <%d>' property is invaild\n",
-	// 			tevs->data_frequency);
-	// 		return -EINVAL;
-	// 	}
-	// }
+	gpiod_set_value_cansleep(tevs->standby_gpio, 0);
 
 	tevs->vc_id = 0;
 	if (of_property_read_u32(tevs->dev->of_node, "vc-id",
