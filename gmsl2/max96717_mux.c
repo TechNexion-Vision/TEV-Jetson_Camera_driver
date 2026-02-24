@@ -495,6 +495,10 @@ static int max_ser_parse_pipe_dt(struct max_ser_priv *priv,
 	pipe->dbl10 = of_property_read_bool(node, "maxim,dbl10");
 	pipe->dbl12 = of_property_read_bool(node, "maxim,dbl12");
 
+	pipe->code_name = "UYVY8_1X16";
+	of_property_read_string(node, "dt", &pipe->code_name);
+	dev_dbg(priv->dev, "format = %s\n", pipe->code_name);
+
 	return 0;
 }
 
@@ -1832,13 +1836,12 @@ static int max96717_post_init(struct max_ser_priv *ser_priv)
 
 	msleep(100);
 
-	/* fix format to UYVY8_1X16 */
-	fmt = max_format_by_code(MEDIA_BUS_FMT_UYVY8_1X16);
-	if (!fmt)
-		return -EINVAL;
-
 	for_each_subdev(ser_priv, sd_priv) {
 		pipe = &ser_priv->pipes[sd_priv->pipe_id];
+
+		fmt = max_format_by_name(pipe->code_name);
+		if (!fmt)
+			return -EINVAL;
 		sd_priv->fmt = fmt;
 
 		mutex_lock(&ser_priv->lock);

@@ -835,6 +835,10 @@ static int max_des_parse_pipe_dt(struct max_des_priv *priv,
 	pipe->dbl8mode = of_property_read_bool(node, "maxim,dbl8-mode");
 	pipe->dbl10mode = of_property_read_bool(node, "maxim,dbl10-mode");
 
+	pipe->code_name = "UYVY8_1X16";
+	of_property_read_string(node, "dt", &pipe->code_name);
+	dev_dbg(priv->dev, "format = %s\n", pipe->code_name);
+
 	ret = max_des_parse_pipe_link_remap_dt(priv, pipe, node);
 	if (ret)
 		return ret;
@@ -2581,21 +2585,21 @@ static int max96724_post_init(struct max_des_priv *des_priv)
 
 	dev_dbg(des_priv->dev, "%s()\n", __func__);
 
-	/* fix format to UYVY8_1X16 */
-	fmt = max_format_by_code(MEDIA_BUS_FMT_UYVY8_1X16);
-	if (!fmt)
-		return -EINVAL;
-
 	for_each_subdev(des_priv, sd_priv) {
 		if (!des_priv->links[sd_priv->index].enabled)
 			continue;
 
 		pipe = &des_priv->pipes[sd_priv->pipe_id];
+
+		fmt = max_format_by_name(pipe->code_name);
+		if (!fmt)
+			return -EINVAL;
 		sd_priv->fmt = fmt;
 
-		dev_dbg(des_priv->dev, "pipe_id [%d], phy_id [%d], src_vc_id [%d], dst_vc_id [%d]\n",
+		dev_dbg(des_priv->dev, "pipe_id [%d], phy_id [%d], src_vc_id [%d], dst_vc_id [%d] fmt [0x%04x]\n",
 			sd_priv->pipe_id, sd_priv->phy_id,
-			sd_priv->src_vc_id, sd_priv->dst_vc_id);
+			sd_priv->src_vc_id, sd_priv->dst_vc_id,
+			sd_priv->fmt->code);
 
 		mutex_lock(&des_priv->lock);
 		ret = max_des_update_pipe_remaps(des_priv, pipe);

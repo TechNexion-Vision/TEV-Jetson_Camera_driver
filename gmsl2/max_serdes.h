@@ -115,16 +115,16 @@ static const struct max_format max_formats[] = {
 	MAX_FMT(SRGGB16_1X16, MAX_DT_RAW16, 16, 0),
 };
 
-static const struct max_format *max_format_by_code(u32 code)
-{
-	unsigned int i;
+// static const struct max_format *max_format_by_code(u32 code)
+// {
+// 	unsigned int i;
 
-	for (i = 0; i < ARRAY_SIZE(max_formats); i++)
-		if (max_formats[i].code == code)
-			return &max_formats[i];
+// 	for (i = 0; i < ARRAY_SIZE(max_formats); i++)
+// 		if (max_formats[i].code == code)
+// 			return &max_formats[i];
 
-	return NULL;
-}
+// 	return NULL;
+// }
 
 static const struct max_format *max_format_by_dt(u8 dt)
 {
@@ -132,6 +132,17 @@ static const struct max_format *max_format_by_dt(u8 dt)
 
 	for (i = 0; i < ARRAY_SIZE(max_formats); i++)
 		if (max_formats[i].dt == dt)
+			return &max_formats[i];
+
+	return NULL;
+}
+
+static const struct max_format *max_format_by_name(const char *name)
+{
+	unsigned int i;
+
+	for (i = 0; i < ARRAY_SIZE(max_formats); i++)
+		if (!strcmp(max_formats[i].name, name))
 			return &max_formats[i];
 
 	return NULL;
