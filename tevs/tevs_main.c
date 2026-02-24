@@ -282,6 +282,9 @@
 #define TOTAL_MICROSEC_PERSEC				(1000000)
 
 #define TEVS_IMG_FORMAT_UYVY				(0x50)
+#define TEVS_IMG_FORMAT_Y8				    (0x52)
+#define TEVS_IMG_FORMAT_RAW8_BYPASS_ISP		(0x80)
+#define TEVS_IMG_FORMAT_RAW8				(0x8A)
 
 #define TEVS_LINK_FREQUENCY_DEFAULT			400000000ull
 #define TEVS_PIXEL_RATE_DEFAULT				200000000ull
@@ -932,16 +935,21 @@ static int tevs_set_bsl_mode(struct tevs *tevs, s32 mode)
 				return -EINVAL;
 			}
 		}
-
+		tevs_i2c_write_16b(tevs,
+				HOST_COMMAND_ISP_CTRL_PREVIEW_MIPI_CTRL,
+				tevs->s_data->sensor_props.sensor_modes->
+					image_properties.pixel_format ==
+					V4L2_PIX_FMT_GREY ?
+					(0x2A << 2 | tevs->vc_id) :
+					(0x3F << 2 | tevs->vc_id));
 		tevs_i2c_write_16b(tevs,
 				HOST_COMMAND_ISP_CTRL_PREVIEW_FORMAT,
-				TEVS_IMG_FORMAT_UYVY);
+				tevs->s_data->sensor_props.sensor_modes->
+					image_properties.pixel_format == V4L2_PIX_FMT_GREY ?
+				TEVS_IMG_FORMAT_Y8 : TEVS_IMG_FORMAT_UYVY);
 		tevs_i2c_write_16b(tevs,
 				HOST_COMMAND_ISP_CTRL_PREVIEW_HINF_CTRL,
 				0x10 | (tevs->continuous_clock << 5) | (tevs->data_lanes));
-		tevs_i2c_write_16b(tevs,
-				HOST_COMMAND_ISP_CTRL_PREVIEW_MIPI_CTRL,
-				tevs->vc_id);
 		break;
 	case TEVS_BSL_MODE_FLASH_IDX:
 		gpiod_set_value_cansleep(tevs->reset_gpio, 0);
@@ -1598,13 +1606,19 @@ static int tevs_init_setting(struct tevs *tevs)
 
 	ret += tevs_i2c_write_16b(tevs,
 				HOST_COMMAND_ISP_CTRL_PREVIEW_FORMAT,
-				TEVS_IMG_FORMAT_UYVY);
+				tevs->s_data->sensor_props.sensor_modes->
+					image_properties.pixel_format == V4L2_PIX_FMT_GREY ?
+				TEVS_IMG_FORMAT_Y8 : TEVS_IMG_FORMAT_UYVY);
 	ret += tevs_i2c_write_16b(tevs,
 				HOST_COMMAND_ISP_CTRL_PREVIEW_HINF_CTRL,
 				0x10 | (tevs->continuous_clock << 5) | (tevs->data_lanes));
 	ret += tevs_i2c_write_16b(tevs,
 				HOST_COMMAND_ISP_CTRL_PREVIEW_MIPI_CTRL,
-				tevs->vc_id);
+				tevs->s_data->sensor_props.sensor_modes->
+					image_properties.pixel_format ==
+					V4L2_PIX_FMT_GREY ?
+					(0x2A << 2 | tevs->vc_id) :
+					(0x3F << 2 | tevs->vc_id));
 	return ret;
 }
 
@@ -1796,10 +1810,19 @@ static int tevs_start_streaming(struct tegracam_device *tc_dev)
 		tevs_sensor_table[tevs->selected_sensor]
 			.frmfmt[tevs->selected_mode]
 			.mode);
-	tevs_i2c_write_16b(
-		tevs,
-		HOST_COMMAND_ISP_CTRL_PREVIEW_FORMAT,
-		TEVS_IMG_FORMAT_UYVY);
+
+	tevs_i2c_write_16b(tevs,
+			HOST_COMMAND_ISP_CTRL_PREVIEW_MIPI_CTRL,
+			tevs->s_data->sensor_props.sensor_modes->
+				image_properties.pixel_format ==
+				V4L2_PIX_FMT_GREY ?
+				(0x2A << 2 | tevs->vc_id) :
+				(0x3F << 2 | tevs->vc_id));
+	tevs_i2c_write_16b(tevs,
+			HOST_COMMAND_ISP_CTRL_PREVIEW_FORMAT,
+			tevs->s_data->sensor_props.sensor_modes->
+				image_properties.pixel_format == V4L2_PIX_FMT_GREY ?
+			TEVS_IMG_FORMAT_Y8 : TEVS_IMG_FORMAT_UYVY);
 	tevs_i2c_write_16b(
 		tevs,
 		HOST_COMMAND_ISP_CTRL_PREVIEW_HINF_CTRL,
