@@ -27,7 +27,7 @@
 | --- | --- |
 | [TEVS](https://www.technexion.com/products/embedded-vision/) | MIPI-CSI2 |
 | [VLS3](https://www.technexion.com/products/serdes/fpd-link/) | FPD-LINK III |
-| [VLS-GM2](https://www.technexion.com/products/serdes/gmsl/gmsl2/) | GMSL2 |
+| [VLS-GM2](https://www.technexion.com/products/serdes/gmsl/gmsl2/) | GMSL |
 
 ## Supported NVIDIA Jetson Developer Kit
 
