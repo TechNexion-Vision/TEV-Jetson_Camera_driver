@@ -1720,10 +1720,11 @@ err_unregister_client:
 			return ret;
 		}
 
-		ret = max96716a_update_bits(priv, 0x13, BIT(6), BIT(6));
-		if (ret)
+		ret = max96716a_update_bits(priv, 0x10, BIT(7), BIT(7));
+		if (ret) {
+			dev_err(priv->dev, "Failed to soft reset deserializer: %d\n", ret);
 			return ret;
-
+		}
 		msleep(65);
 
 		ret = max96716a_wait_for_device(priv);
@@ -1732,6 +1733,19 @@ err_unregister_client:
 			return ret;
 		}
 	}
+
+	/* Focus to pixel mode */
+	ret = max96716a_update_bits(priv, 0x474, BIT(0), 0x00);
+	ret += max96716a_update_bits(priv, 0x4b4, BIT(0), 0x00);
+	if (ret)
+		return ret;
+
+	/* Disable link auto-select and set splitter mode */
+	ret = max96716a_write(priv, 0x10, 0x23);
+	ret += max96716a_update_bits(priv, 0x12, BIT(5), BIT(5));
+	if (ret)
+		return ret;
+	msleep(65);
 
 	return ret;
 }
@@ -2548,19 +2562,6 @@ static int max96716a_probe(struct i2c_client *client)
 	ret = max96716a_reset(priv);
 	if (ret)
 		return ret;
-
-	/* Focus to pixel mode */
-	ret = max96716a_update_bits(priv, 0x474, BIT(0), 0x00);
-	ret += max96716a_update_bits(priv, 0x4b4, BIT(0), 0x00);
-	if (ret)
-		return ret;
-
-	/* Disable link auto-select and set splitter mode */
-	ret = max96716a_write(priv, 0x10, 0x23);
-	ret += max96716a_update_bits(priv, 0x12, BIT(5), BIT(5));
-	if (ret)
-		return ret;
-	msleep(65);
 
 	return max_des_probe(&priv->des_priv);
 }
