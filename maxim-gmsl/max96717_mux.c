@@ -1513,7 +1513,7 @@ static int max96717_init(struct max_ser_priv *ser_priv)
 		ret = max96717_update_bits(priv, 0x10, BIT(5), BIT(5));
 		if (ret)
 			return ret;
-		msleep(45);
+		msleep(70);
 	}
 
 	/* Disable ports. */
