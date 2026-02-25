@@ -33,7 +33,7 @@
 #define MAX_DES_LINK_FREQUENCY_DEFAULT	(750000000ull)
 #define MAX_DES_LINK_FREQUENCY_MAX		(1250000000ull)
 
-#define MAX9296_N_GMSL			(2)
+#define MAX9296A_N_GMSL			(2)
 
 #define MAX9296A_PIPES_NUM		(4)
 #define MAX9296A_NAME			"max9296a"
@@ -613,7 +613,7 @@ static int max_des_parse_i2c_dt(struct max_des_priv *priv)
 		u32 id = 0;
 
 		of_property_read_u32(node, "reg", &id);
-		if (id >= MAX9296_N_GMSL)
+		if (id >= MAX9296A_N_GMSL)
 			continue;
 
 		if (!of_device_is_available(node)) {
