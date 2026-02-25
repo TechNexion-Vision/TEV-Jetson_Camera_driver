@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * Maxim MAX96716A Quad GMSL2 Deserializer Driver
+ * Maxim MAX96716A Dual GMSL2 Deserializer Driver
  *
  */
 
@@ -33,7 +33,7 @@
 #define MAX_DES_LINK_FREQUENCY_DEFAULT	(750000000ull)
 #define MAX_DES_LINK_FREQUENCY_MAX		(1250000000ull)
 
-#define MAX96716_N_GMSL			(2)
+#define MAX96716A_N_GMSL			(2)
 
 #define MAX96716A_PIPES_NUM		(2)
 #define MAX96716A_NAME			"max96716a"
@@ -617,7 +617,7 @@ static int max_des_parse_i2c_dt(struct max_des_priv *priv)
 		u32 id = 0;
 
 		of_property_read_u32(node, "reg", &id);
-		if (id >= MAX96716_N_GMSL)
+		if (id >= MAX96716A_N_GMSL)
 			continue;
 
 		if (!of_device_is_available(node)) {
