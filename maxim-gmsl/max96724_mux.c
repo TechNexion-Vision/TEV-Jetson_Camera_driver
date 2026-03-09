@@ -2081,10 +2081,10 @@ static int max96724_check_gmsl_links(struct max_des_priv *des_priv)
 		if (current_link == -1)
 			break;
 
-		des_priv->pipes[current_link].enabled = false;
+		des_priv->links[current_link].enabled = false;
 		if ((max96724_read(priv, link_lock_addr[current_link]) & BIT(3)) == BIT(3)) {
 			locked_links_mask |= BIT(current_link);
-			des_priv->pipes[current_link].enabled = true;
+			des_priv->links[current_link].enabled = true;
 		}
 
 		links_mask &= ~BIT(current_link);
@@ -2425,7 +2425,7 @@ static int max96724_init_pipe(struct max_des_priv *des_priv,
 		if (ret)
 			return ret;
 
-		ret = max96724_update_bits(priv, 0x18, 0x0f, 0x0f);
+		ret = max96724_update_bits(priv, 0x18, BIT(index), BIT(index));
 		if (ret)
 			return ret;
 		msleep(60);
@@ -2514,7 +2514,7 @@ static int max96724_init_link(struct max_des_priv *des_priv,
 	if (ret)
 		return ret;
 
-	ret = max96724_update_bits(priv, 0x18, 0x0f, 0x0f);
+	ret = max96724_update_bits(priv, 0x18, BIT(index), BIT(index));
 	if (ret)
 		return ret;
 	msleep(60);
