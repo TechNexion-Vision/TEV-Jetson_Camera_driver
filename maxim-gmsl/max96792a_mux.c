@@ -575,7 +575,6 @@ static int max_des_parse_link_ser_xlate(struct max_des_priv *priv)
 	ret = 0;
 	for (i = 0; i < priv->ops->num_links; i++) {
 		struct max_des_link *link = &priv->links[i];
-		struct max_des_pipe *pipe = &priv->pipes[i];
 
 		if (!link->enabled)
 			continue;
@@ -610,7 +609,6 @@ static int max_des_parse_link_ser_xlate(struct max_des_priv *priv)
 		ret = max_des_init_link_ser_xlate(priv, link, xlate->dst, xlate->src, xlate->id);
 		if (ret != 0) {
 			link->enabled = false;
-			pipe->enabled = false;
 			continue;
 		}
 	}
@@ -1823,10 +1821,10 @@ static int max96792a_check_gmsl_links(struct max_des_priv *des_priv)
 		if (current_link == -1)
 			break;
 
-		des_priv->pipes[current_link].enabled = false;
+		des_priv->links[current_link].enabled = false;
 		if ((max96792a_read(priv, link_lock_addr[current_link]) & BIT(3)) == BIT(3)) {
 			locked_links_mask |= BIT(current_link);
-			des_priv->pipes[current_link].enabled = true;
+			des_priv->links[current_link].enabled = true;
 		}
 
 		links_mask &= ~BIT(current_link);
@@ -2230,7 +2228,7 @@ static int max96792a_init_pipe(struct max_des_priv *des_priv,
 	mask = GENMASK(2 + 3 * (index - 1), 0 + 3 * (index - 1));
 	ret = max96792a_update_bits(
 							priv, 0x161, mask,
-							(pipe->stream_id + 4 * (index - 1)) << 3);
+							(pipe->stream_id + 4 * pipe->link_id) << (3 * (index - 1)));
 	if (ret)
 		return ret;
 
@@ -2325,8 +2323,10 @@ static int max96792a_init_link(struct max_des_priv *des_priv,
 	// if (ret)
 	// 	return ret;
 
-	// ret = max96792a_update_bits(priv, 0x10, BIT(5), BIT(5));
-	// ret += max96792a_update_bits(priv, 0x12, BIT(5), BIT(5));
+	// if (index == 0)
+	// 	ret = max96716a_update_bits(priv, 0x10, BIT(5), BIT(5));
+	// else if (index == 1)
+	// 	ret = max96716a_update_bits(priv, 0x12, BIT(5), BIT(5));
 	// if (ret)
 	// 	return ret;
 	// msleep(70);
@@ -2342,8 +2342,10 @@ static int max96792a_init_link(struct max_des_priv *des_priv,
 		if (ret)
 			return ret;
 
-		ret = max96792a_update_bits(priv, 0x10, BIT(5), BIT(5));
-		ret += max96792a_update_bits(priv, 0x12, BIT(5), BIT(5));
+		if (index == 0)
+			ret = max96716a_update_bits(priv, 0x10, BIT(5), BIT(5));
+		else if (index == 1)
+			ret = max96716a_update_bits(priv, 0x12, BIT(5), BIT(5));
 		if (ret)
 			return ret;
 		msleep(70);
@@ -2481,10 +2483,10 @@ static int max96792a_post_init(struct max_des_priv *des_priv)
 	dev_dbg(des_priv->dev, "%s()\n", __func__);
 
 	for_each_subdev(des_priv, sd_priv) {
+		pipe = &des_priv->pipes[sd_priv->pipe_id];
+
 		if (!des_priv->links[sd_priv->index].enabled)
 			continue;
-
-		pipe = &des_priv->pipes[sd_priv->pipe_id];
 
 		fmt = max_format_by_name(pipe->code_name);
 		if (!fmt)
@@ -2510,6 +2512,7 @@ static int max96792a_post_init(struct max_des_priv *des_priv)
 }
 
 static const struct max_des_ops max96792a_ops = {
+	.supports_pipe_link_remap = true,
 	.mipi_enable = max96792a_mipi_enable,
 	.init = max96792a_init,
 	.init_phy = max96792a_init_phy,
