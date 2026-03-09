@@ -176,10 +176,8 @@ static int max_des_i2c_mux_select(struct i2c_mux_core *muxc, u32 chan)
 
 static int max_des_i2c_mux_init(struct max_des_priv *priv)
 {
-	unsigned int i;
+	struct max_des_subdev_priv *sd_priv;
 	int ret;
-
-	dev_dbg(priv->dev, "%s()\n", __func__);
 
 	if (!i2c_check_functionality(priv->client->adapter, I2C_FUNC_SMBUS_WRITE_BYTE_DATA))
 		return -ENODEV;
@@ -194,8 +192,9 @@ static int max_des_i2c_mux_init(struct max_des_priv *priv)
 
 	priv->mux->priv = priv;
 
-	for (i = 0; i < priv->ops->num_links; i++) {
-		struct max_des_link *link = &priv->links[i];
+	for_each_subdev(priv, sd_priv) {
+		struct max_des_pipe *pipe = &priv->pipes[sd_priv->pipe_id];
+		struct max_des_link *link = &priv->links[pipe->link_id];
 
 		if (!link->enabled)
 			continue;
