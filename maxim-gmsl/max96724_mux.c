@@ -96,7 +96,7 @@ static int max_ser_wait_for_multiple(struct i2c_client *client, struct regmap *r
 
 		msleep(100);
 
-		dev_dbg(&client->dev, "Retry %u waiting for serializer: %d\n", i, ret);
+		dev_dbg(&client->dev, "%s(): Retry %u waiting for serializer: %d\n", __func__, i, ret);
 	}
 
 	return ret;
@@ -192,7 +192,7 @@ static int max_des_update_pipe_remaps(struct max_des_priv *priv,
 	struct max_des_subdev_priv *sd_priv;
 	unsigned int i;
 
-	dev_dbg(priv->dev, "%s()\n", __func__);
+	dev_dbg(priv->dev, "%s(): pipe index [%d]\n", __func__, pipe->index);
 
 	pipe->num_remaps = 0;
 
@@ -201,6 +201,9 @@ static int max_des_update_pipe_remaps(struct max_des_priv *priv,
 
 	for_each_subdev(priv, sd_priv) {
 		unsigned int num_remaps;
+
+		dev_dbg(priv->dev, "%s(): %s pipe id [%d]\n",
+			__func__, sd_priv->label, sd_priv->pipe_id);
 
 		if (sd_priv->pipe_id != pipe->index)
 			continue;
@@ -273,19 +276,6 @@ static int max_des_post_init(struct max_des_priv *priv)
 
 static int max_des_i2c_mux_select(struct i2c_mux_core *muxc, u32 chan)
 {
-	// struct max_des_priv *des_priv = i2c_mux_priv(muxc);
-	// struct max96724_priv *priv = des_to_priv(des_priv);
-	// u8 val = 0xff;
-
-	// if (des_priv->mux_chan == chan)
-	// 	return 0;
-
-	// val &= ~(0x3 << (chan * 2));
-	// val |= 0x2 << (chan * 2);
-	// regmap_write(priv->regmap, 0x3, val);
-
-	// des_priv->mux_chan = chan;
-
 	return 0;
 }
 
@@ -337,8 +327,6 @@ static int max_des_init(struct max_des_priv *priv)
 	unsigned int i;
 	int ret;
 
-	dev_dbg(priv->dev, "%s()\n", __func__);
-
 	ret = __max_des_mipi_update(priv);
 	if (ret)
 		return ret;
@@ -349,6 +337,10 @@ static int max_des_init(struct max_des_priv *priv)
 
 	for (i = 0; i < priv->ops->num_phys; i++) {
 		struct max_des_phy *phy = &priv->phys[i];
+
+		dev_dbg(priv->dev, "%s(): phy [%d]: %s\n",
+			__func__, phy->index,
+			phy->enabled ? "enabled" : "disabled");
 
 		if (!phy->enabled)
 			continue;
@@ -365,9 +357,22 @@ static int max_des_init(struct max_des_priv *priv)
 
 	for (i = 0; i < priv->ops->num_pipes; i++) {
 		struct max_des_pipe *pipe = &priv->pipes[i];
+		struct max_des_link *link = &priv->links[pipe->link_id];
+
+		dev_dbg(priv->dev, "%s(): pipe [%d]: %s\n",
+			__func__, pipe->index,
+			pipe->enabled ? "enabled" : "disabled");
 
 		if (!pipe->enabled)
 			continue;
+
+		dev_dbg(priv->dev, "%s(): pipe link [%d]: %s\n",
+		__func__, pipe->link_id,
+		link->enabled ? "enabled" : "disabled");
+
+		if (!link->enabled) {
+			continue;
+		}
 
 		ret = priv->ops->init_pipe(priv, pipe);
 		if (ret)
@@ -377,7 +382,8 @@ static int max_des_init(struct max_des_priv *priv)
 		if (ret)
 			return ret;
 
-		dev_info(priv->dev, "link [%d]: %s mode",
+		dev_info(priv->dev, "pipe [%d] -> link [%d]: %s mode",
+			pipe->index,
 			pipe->link_id,
 			priv->links[pipe->link_id].tunnel_mode ? "tunnel" : "pixel");
 	}
@@ -385,6 +391,10 @@ static int max_des_init(struct max_des_priv *priv)
 	if (priv->ops->init_link) {
 		for (i = 0; i < priv->ops->num_links; i++) {
 			struct max_des_link *link = &priv->links[i];
+
+			dev_dbg(priv->dev, "%s(): link [%d]: %s\n",
+				__func__, link->index,
+				link->enabled ? "enabled" : "disabled");
 
 			if (!link->enabled)
 				continue;
@@ -417,13 +427,11 @@ static int max_des_parse_fsync(struct max_des_priv *priv)
 	u32 fsync_freq = 0;
 	int ret;
 
-	dev_dbg(priv->dev, "%s()\n", __func__);
-
 	if (of_property_read_string(dev->of_node, "fsync-mode", &fsync_mode)) {
 		return 0;
 	}
 
-	dev_dbg(priv->dev, "mode: %s\n", fsync_mode);
+	dev_dbg(priv->dev, "%s(): mode: %s\n", __func__, fsync_mode);
 
 	if (!strcmp("internal", fsync_mode) ||
 		!strcmp("internal-output", fsync_mode)) {
@@ -546,7 +554,7 @@ static int max_des_parse_link_ser_xlate(struct max_des_priv *priv)
 				  &ret);
 
 	if (local == NULL || remote == NULL || source == NULL) {
-		dev_dbg(priv->dev, "find not property of alias map\n");
+		dev_dbg(priv->dev, "%s(): find not property of alias map\n", __func__);
 		return 0;
 	}
 
@@ -600,8 +608,6 @@ static int max_des_parse_i2c_dt(struct max_des_priv *priv)
 	struct device_node *i2c_mux;
 	struct device_node *node = NULL;
 
-	dev_dbg(priv->dev, "%s()\n", __func__);
-
 	i2c_mux = of_find_node_by_name(dev->of_node, "i2c-mux");
 	if (!i2c_mux) {
 		dev_err(priv->dev, "Failed to find i2c-mux node\n");
@@ -617,7 +623,7 @@ static int max_des_parse_i2c_dt(struct max_des_priv *priv)
 			continue;
 
 		if (!of_device_is_available(node)) {
-			dev_dbg(priv->dev, "Skipping disabled I2C bus port %u\n", id);
+			dev_dbg(priv->dev, "%s(): Skipping disabled I2C bus port %u\n", __func__, id);
 			continue;
 		}
 
@@ -648,8 +654,6 @@ static int max_des_parse_ch_dt(struct max_des_subdev_priv *sd_priv,
 	struct v4l2_fwnode_bus_mipi_csi2 *mipi = &v4l2_ep.bus.mipi_csi2;
 	unsigned int i;
 	int ret;
-
-	dev_dbg(priv->dev, "%s()\n", __func__);
 
 	of_property_read_string(node, "label", &sd_priv->label);
 
@@ -804,8 +808,6 @@ static int max_des_parse_pipe_dt(struct max_des_priv *priv,
 	u32 val;
 	int ret;
 
-	dev_dbg(priv->dev, "%s()\n", __func__);
-
 	val = pipe->phy_id;
 	of_property_read_u32(node, "maxim,phy-id", &val);
 	if (val >= priv->ops->num_phys) {
@@ -837,7 +839,7 @@ static int max_des_parse_pipe_dt(struct max_des_priv *priv,
 
 	pipe->code_name = "UYVY8_1X16";
 	of_property_read_string(node, "dt", &pipe->code_name);
-	dev_dbg(priv->dev, "format = %s\n", pipe->code_name);
+	dev_dbg(priv->dev, "%s(): format = %s\n", __func__, pipe->code_name);
 
 	ret = max_des_parse_pipe_link_remap_dt(priv, pipe, node);
 	if (ret)
@@ -1070,7 +1072,8 @@ static int max96724_read(struct max96724_priv *priv, int reg)
 	int ret, val;
 
 	ret = regmap_read(priv->regmap, reg, &val);
-	dev_dbg(priv->dev, "read %d 0x%x = 0x%02x\n", ret, reg, val);
+	dev_dbg(priv->dev, "%s(): read %d 0x%x = 0x%02x\n", __func__, ret, reg, val);
+
 	if (ret) {
 		dev_err(priv->dev, "read 0x%04x failed\n", reg);
 		return ret;
@@ -1084,7 +1087,8 @@ static int max96724_write(struct max96724_priv *priv, unsigned int reg, u8 val)
 	int ret;
 
 	ret = regmap_write(priv->regmap, reg, val);
-	dev_dbg(priv->dev, "write %d 0x%x = 0x%02x\n", ret, reg, val);
+	dev_dbg(priv->dev, "%s(): write %d 0x%x = 0x%02x\n", __func__, ret, reg, val);
+
 	if (ret)
 		dev_err(priv->dev, "write 0x%04x failed\n", reg);
 
@@ -1097,7 +1101,8 @@ static int max96724_update_bits(struct max96724_priv *priv, unsigned int reg,
 	int ret;
 
 	ret = regmap_update_bits(priv->regmap, reg, mask, val);
-	dev_dbg(priv->dev, "update %d 0x%x 0x%02x = 0x%02x\n", ret, reg, mask, val);
+	dev_dbg(priv->dev, "%s(): update %d 0x%x 0x%02x = 0x%02x\n", __func__, ret, reg, mask, val);
+
 	if (ret)
 		dev_err(priv->dev, "update 0x%04x failed\n", reg);
 
@@ -1784,14 +1789,14 @@ static int max_des_wait_for_multiple(struct i2c_client *client, struct regmap *r
 
 			ret = regmap_read(regmap, 0x0, &val);
 			if (ret >= 0) {
-				dev_dbg(&client->dev, "Find deserializer addr: 0x%02x\n", client->addr);
+				dev_dbg(&client->dev, "%s(): Find deserializer addr: 0x%02x\n", __func__, client->addr);
 				return 0;
 			}
 		}
 
 		msleep(100);
 
-		dev_dbg(&client->dev, "Retry %u waiting for deserializer: %d\n", i, ret);
+		dev_dbg(&client->dev, "%s(): Retry %u waiting for deserializer: %d\n", __func__, i, ret);
 	}
 
 	return ret;
@@ -1809,7 +1814,7 @@ static int max96724_wait_for_device(struct max96724_priv *priv)
 
 		msleep(100);
 
-		dev_dbg(priv->dev, "Retry %u waiting for deserializer: %d\n", i, ret);
+		dev_dbg(priv->dev, "%s(): Retry %u waiting for deserializer: %d\n", __func__, i, ret);
 	}
 
 	return ret;
@@ -2596,10 +2601,9 @@ static int max96724_post_init(struct max_des_priv *des_priv)
 			return -EINVAL;
 		sd_priv->fmt = fmt;
 
-		dev_dbg(des_priv->dev, "pipe_id [%d], phy_id [%d], src_vc_id [%d], dst_vc_id [%d] fmt [0x%04x]\n",
-			sd_priv->pipe_id, sd_priv->phy_id,
-			sd_priv->src_vc_id, sd_priv->dst_vc_id,
-			sd_priv->fmt->code);
+		dev_dbg(des_priv->dev, "%s(): %s pipe_id [%d], phy_id [%d], src_vc_id [%d], dst_vc_id [%d] fmt [0x%04x]\n",
+			__func__, sd_priv->label, sd_priv->pipe_id, sd_priv->phy_id,
+			sd_priv->src_vc_id, sd_priv->dst_vc_id,	sd_priv->fmt->code);
 
 		mutex_lock(&des_priv->lock);
 		ret = max_des_update_pipe_remaps(des_priv, pipe);
