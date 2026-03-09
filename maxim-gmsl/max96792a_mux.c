@@ -1727,7 +1727,7 @@ err_unregister_client:
 	else {
 		ret = max96792a_wait_for_device(priv);
 		if (ret) {
-			dev_err(priv->dev, "Failed waiting for MAX96716a, err: %d\n", ret);
+			dev_err(priv->dev, "Failed waiting for MAX96792a, err: %d\n", ret);
 			return ret;
 		}
 
@@ -1740,7 +1740,7 @@ err_unregister_client:
 
 		ret = max96792a_wait_for_device(priv);
 		if (ret) {
-			dev_err(priv->dev, "Failed waiting for MAX96716a, err: %d\n", ret);
+			dev_err(priv->dev, "Failed waiting for MAX96792a, err: %d\n", ret);
 			return ret;
 		}
 	}
@@ -2323,9 +2323,9 @@ static int max96792a_init_link(struct max_des_priv *des_priv,
 	// 	return ret;
 
 	// if (index == 0)
-	// 	ret = max96716a_update_bits(priv, 0x10, BIT(5), BIT(5));
+	// 	ret = max96792a_update_bits(priv, 0x10, BIT(5), BIT(5));
 	// else if (index == 1)
-	// 	ret = max96716a_update_bits(priv, 0x12, BIT(5), BIT(5));
+	// 	ret = max96792a_update_bits(priv, 0x12, BIT(5), BIT(5));
 	// if (ret)
 	// 	return ret;
 	// msleep(70);
@@ -2342,9 +2342,9 @@ static int max96792a_init_link(struct max_des_priv *des_priv,
 			return ret;
 
 		if (index == 0)
-			ret = max96716a_update_bits(priv, 0x10, BIT(5), BIT(5));
+			ret = max96792a_update_bits(priv, 0x10, BIT(5), BIT(5));
 		else if (index == 1)
-			ret = max96716a_update_bits(priv, 0x12, BIT(5), BIT(5));
+			ret = max96792a_update_bits(priv, 0x12, BIT(5), BIT(5));
 		if (ret)
 			return ret;
 		msleep(70);
