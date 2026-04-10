@@ -1499,6 +1499,11 @@ static int max96717_init(struct max_ser_priv *ser_priv)
 	if (ret)
 		return ret;
 
+	/* Enable GMSL Negative Output in Coax Mode for Optimal Performance */
+	ret = regmap_write(priv->regmap, 0x14ce, 0x19);
+	if (ret)
+		return ret;
+
 	if (priv->info->supports_tunnel_mode) {
 		mask = BIT(7);
 		dev_info(priv->dev, "%s() - set tunnel_mode [%d]\n",
