@@ -134,12 +134,12 @@ static struct resolution ar1335_res_list[] = {
 };
 
 static struct resolution ar2020_res_list[] = {
-	{ .width = 640, .height = 480, .framerates = 60, .mode = 3 },
+	{ .width = 640, .height = 480, .framerates = 120, .mode = 3 },
 	{ .width = 1280, .height = 720, .framerates = 120, .mode = 3 },
-	{ .width = 1920, .height = 1080, .framerates = 60, .mode = 2 },
-	{ .width = 2560, .height = 1440, .framerates = 30, .mode = 2 },
-	{ .width = 3840, .height = 2160, .framerates = 15, .mode = 1 },
-	{ .width = 4208, .height = 3120, .framerates = 10, .mode = 1 },
+	{ .width = 1280, .height = 960, .framerates = 100, .mode = 3 },
+	{ .width = 1920, .height = 1440, .framerates = 40, .mode = 2 },
+	{ .width = 2160, .height = 1920, .framerates = 25, .mode = 2 },
+	{ .width = 4208, .height = 3156, .framerates = 10, .mode = 0 },
 };
 
 struct sensor_info {
@@ -220,9 +220,12 @@ static const int __10fps = 10;
 static const int __15fps = 15;
 static const int __20fps = 20;
 static const int __24fps = 24;
+static const int __25fps = 25;
 static const int __30fps = 30;
 static const int __32fps = 32;
+static const int __40fps = 40;
 static const int __60fps = 60;
+static const int __100fps = 100;
 static const int __115fps = 115;
 static const int __120fps = 120;
 
@@ -325,12 +328,12 @@ static const struct camera_common_frmfmt ar1335_frmfmt[] = {
 };
 
 static const struct camera_common_frmfmt ar2020_frmfmt[] = {
-	{{640, 480}, &__60fps, 1, 0, 3},
+	{{640, 480}, &__120fps, 1, 0, 3},
 	{{1280, 720}, &__120fps, 1, 0, 3},
-	{{1920, 1080}, &__60fps, 1, 0, 2},
-	{{2560, 1440}, &__30fps, 1, 0, 2},
-	{{3840, 2160}, &__15fps, 1, 0, 1},
-	{{4224, 3120}, &__10fps, 1, 0, 1},
+	{{1280, 960}, &__100fps, 1, 0, 3},
+	{{1920, 1440}, &__40fps, 1, 0, 2},
+	{{2560, 1920}, &__25fps, 1, 0, 2},
+	{{4224, 3156}, &__10fps, 1, 0, 0},
 };
 
 struct sensor_info {
