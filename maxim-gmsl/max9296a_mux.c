@@ -1754,49 +1754,6 @@ static int max9296a_init(struct max_des_priv *des_priv)
 		return ret;
 	msleep(50);
 
-	/* Register pin controller */
-	priv->pctldesc = (struct pinctrl_desc){
-		.owner = THIS_MODULE,
-		.name = MAX9296A_NAME,
-		.pins = max9296a_pins,
-		.npins = ARRAY_SIZE(max9296a_pins),
-		.pctlops = &max9296a_ctrl_ops,
-		.confops = &max9296a_conf_ops,
-		.pmxops = &max9296a_mux_ops,
-		.custom_params = max9296a_cfg_params,
-		.num_custom_params = ARRAY_SIZE(max9296a_cfg_params),
-	};
-
-	ret = devm_pinctrl_register_and_init(priv->dev, &priv->pctldesc, priv,
-						&priv->pctldev);
-	if (ret)
-		return ret;
-
-	ret = pinctrl_enable(priv->pctldev);
-	if (ret)
-		return ret;
-
-	priv->gc = (struct gpio_chip){
-		.owner = THIS_MODULE,
-		.label = MAX9296A_NAME,
-		.base = -1,
-		.ngpio = MAX9296A_GPIO_NUM,
-		.parent = priv->dev,
-		.can_sleep = true,
-		.request = gpiochip_generic_request,
-		.free = gpiochip_generic_free,
-		.set_config = gpiochip_generic_config,
-		.get_direction = max9296a_gpio_get_direction,
-		.direction_input = max9296a_gpio_direction_input,
-		.direction_output = max9296a_gpio_direction_output,
-		.get = max9296a_gpio_get,
-		.set = max9296a_gpio_set,
-	};
-
-	ret = devm_gpiochip_add_data(priv->dev, &priv->gc, priv);
-	if (ret)
-		return ret;
-
 	return 0;
 }
 
@@ -2404,6 +2361,49 @@ static int max9296a_probe(struct i2c_client *client)
 	msleep(50);
 
 	ret = max9296a_reset(priv);
+	if (ret)
+		return ret;
+
+	/* Register pin controller */
+	priv->pctldesc = (struct pinctrl_desc){
+		.owner = THIS_MODULE,
+		.name = MAX9296A_NAME,
+		.pins = max9296a_pins,
+		.npins = ARRAY_SIZE(max9296a_pins),
+		.pctlops = &max9296a_ctrl_ops,
+		.confops = &max9296a_conf_ops,
+		.pmxops = &max9296a_mux_ops,
+		.custom_params = max9296a_cfg_params,
+		.num_custom_params = ARRAY_SIZE(max9296a_cfg_params),
+	};
+
+	ret = devm_pinctrl_register_and_init(priv->dev, &priv->pctldesc, priv,
+						&priv->pctldev);
+	if (ret)
+		return ret;
+
+	ret = pinctrl_enable(priv->pctldev);
+	if (ret)
+		return ret;
+
+	priv->gc = (struct gpio_chip){
+		.owner = THIS_MODULE,
+		.label = MAX9296A_NAME,
+		.base = -1,
+		.ngpio = MAX9296A_GPIO_NUM,
+		.parent = priv->dev,
+		.can_sleep = true,
+		.request = gpiochip_generic_request,
+		.free = gpiochip_generic_free,
+		.set_config = gpiochip_generic_config,
+		.get_direction = max9296a_gpio_get_direction,
+		.direction_input = max9296a_gpio_direction_input,
+		.direction_output = max9296a_gpio_direction_output,
+		.get = max9296a_gpio_get,
+		.set = max9296a_gpio_set,
+	};
+
+	ret = devm_gpiochip_add_data(priv->dev, &priv->gc, priv);
 	if (ret)
 		return ret;
 

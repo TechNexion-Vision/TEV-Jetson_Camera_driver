@@ -1895,49 +1895,6 @@ static int max96716a_init(struct max_des_priv *des_priv)
 		return ret;
 	msleep(65);
 
-	/* Register pin controller */
-	priv->pctldesc = (struct pinctrl_desc){
-		.owner = THIS_MODULE,
-		.name = MAX96716A_NAME,
-		.pins = max96716a_pins,
-		.npins = ARRAY_SIZE(max96716a_pins),
-		.pctlops = &max96716a_ctrl_ops,
-		.confops = &max96716a_conf_ops,
-		.pmxops = &max96716a_mux_ops,
-		.custom_params = max96716a_cfg_params,
-		.num_custom_params = ARRAY_SIZE(max96716a_cfg_params),
-	};
-
-	ret = devm_pinctrl_register_and_init(priv->dev, &priv->pctldesc, priv,
-						&priv->pctldev);
-	if (ret)
-		return ret;
-
-	ret = pinctrl_enable(priv->pctldev);
-	if (ret)
-		return ret;
-
-	priv->gc = (struct gpio_chip){
-		.owner = THIS_MODULE,
-		.label = MAX96716A_NAME,
-		.base = -1,
-		.ngpio = MAX96716A_GPIO_NUM,
-		.parent = priv->dev,
-		.can_sleep = true,
-		.request = gpiochip_generic_request,
-		.free = gpiochip_generic_free,
-		.set_config = gpiochip_generic_config,
-		.get_direction = max96716a_gpio_get_direction,
-		.direction_input = max96716a_gpio_direction_input,
-		.direction_output = max96716a_gpio_direction_output,
-		.get = max96716a_gpio_get,
-		.set = max96716a_gpio_set,
-	};
-
-	ret = devm_gpiochip_add_data(priv->dev, &priv->gc, priv);
-	if (ret)
-		return ret;
-
 	return 0;
 }
 
@@ -2575,6 +2532,49 @@ static int max96716a_probe(struct i2c_client *client)
 	msleep(65);
 
 	ret = max96716a_reset(priv);
+	if (ret)
+		return ret;
+
+	/* Register pin controller */
+	priv->pctldesc = (struct pinctrl_desc){
+		.owner = THIS_MODULE,
+		.name = MAX96716A_NAME,
+		.pins = max96716a_pins,
+		.npins = ARRAY_SIZE(max96716a_pins),
+		.pctlops = &max96716a_ctrl_ops,
+		.confops = &max96716a_conf_ops,
+		.pmxops = &max96716a_mux_ops,
+		.custom_params = max96716a_cfg_params,
+		.num_custom_params = ARRAY_SIZE(max96716a_cfg_params),
+	};
+
+	ret = devm_pinctrl_register_and_init(priv->dev, &priv->pctldesc, priv,
+						&priv->pctldev);
+	if (ret)
+		return ret;
+
+	ret = pinctrl_enable(priv->pctldev);
+	if (ret)
+		return ret;
+
+	priv->gc = (struct gpio_chip){
+		.owner = THIS_MODULE,
+		.label = MAX96716A_NAME,
+		.base = -1,
+		.ngpio = MAX96716A_GPIO_NUM,
+		.parent = priv->dev,
+		.can_sleep = true,
+		.request = gpiochip_generic_request,
+		.free = gpiochip_generic_free,
+		.set_config = gpiochip_generic_config,
+		.get_direction = max96716a_gpio_get_direction,
+		.direction_input = max96716a_gpio_direction_input,
+		.direction_output = max96716a_gpio_direction_output,
+		.get = max96716a_gpio_get,
+		.set = max96716a_gpio_set,
+	};
+
+	ret = devm_gpiochip_add_data(priv->dev, &priv->gc, priv);
 	if (ret)
 		return ret;
 
