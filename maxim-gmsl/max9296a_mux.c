@@ -38,6 +38,13 @@
 #define MAX9296A_PIPES_NUM		(4)
 #define MAX9296A_NAME			"max9296a"
 #define MAX9296A_GPIO_NUM		(13)
+#define MAX9296A_REG5			0x005
+#define MAX9296A_REG5_LOCK_EN		BIT(7)
+#define MAX9296A_REG5_ERRB_EN		BIT(6)
+#define MAX9296A_MFP4_GPIO_A		0x2bc
+#define MAX9296A_MFP4_GPIO_B		0x2bd
+#define MAX9296A_X6_ORN_MFP4_GPIO_A_VAL	0x94
+#define MAX9296A_X6_ORN_MFP4_GPIO_B_VAL	0x60
 
 struct max9296a_priv {
 	struct max_des_priv des_priv;
@@ -1604,6 +1611,31 @@ static int max9296a_wait_for_device(struct max9296a_priv *priv)
 	return ret;
 }
 
+static int max9296a_x6_orn_mfp4_power_init(struct max9296a_priv *priv)
+{
+	int ret;
+
+	ret = max9296a_write(priv, MAX9296A_MFP4_GPIO_A,
+			     MAX9296A_X6_ORN_MFP4_GPIO_A_VAL);
+	if (ret)
+		return ret;
+
+	ret = max9296a_write(priv, MAX9296A_MFP4_GPIO_B,
+			     MAX9296A_X6_ORN_MFP4_GPIO_B_VAL);
+	if (ret)
+		return ret;
+
+	ret = max9296a_write(priv, MAX9296A_REG5, MAX9296A_REG5_LOCK_EN);
+	if (ret)
+		return ret;
+
+	msleep(50);
+
+	dev_info(priv->dev, "X6-ORN MFP4 power init applied, ERRB disabled\n");
+
+	return 0;
+}
+
 static int max9296a_reset(struct max9296a_priv *priv)
 {
 	struct i2c_client *client;
@@ -2363,6 +2395,13 @@ static int max9296a_probe(struct i2c_client *client)
 	ret = max9296a_reset(priv);
 	if (ret)
 		return ret;
+
+	if (of_property_read_bool(dev->of_node,
+				  "maxim,x6-orn-mfp4-power-init")) {
+		ret = max9296a_x6_orn_mfp4_power_init(priv);
+		if (ret)
+			return ret;
+	}
 
 	/* Register pin controller */
 	priv->pctldesc = (struct pinctrl_desc){
