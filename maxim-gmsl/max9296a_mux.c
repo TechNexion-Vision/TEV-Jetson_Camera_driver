@@ -43,8 +43,9 @@
 #define MAX9296A_REG5_ERRB_EN		BIT(6)
 #define MAX9296A_MFP4_GPIO_A		0x2bc
 #define MAX9296A_MFP4_GPIO_B		0x2bd
-#define MAX9296A_X6_ORN_MFP4_GPIO_A_VAL	0x94
-#define MAX9296A_X6_ORN_MFP4_GPIO_B_VAL	0x60
+#define MAX9296A_MFP4_POWER_GPIO_A_VAL	0x94
+#define MAX9296A_MFP4_POWER_GPIO_B_VAL	0x60
+#define MAX9296A_MFP4_PIN		4
 
 struct max9296a_priv {
 	struct max_des_priv des_priv;
@@ -62,6 +63,8 @@ struct max9296a_priv {
 	unsigned int source_id;
 
 	struct gpio_desc *reset_gpio;
+
+	bool mfp4_errb_disabled;
 };
 
 struct max9296a_chip_info {
@@ -1116,6 +1119,41 @@ static int max9296a_update_bits(struct max9296a_priv *priv, unsigned int reg,
 	return ret;
 }
 
+static int max9296a_mfp4_disable_errb(struct max9296a_priv *priv)
+{
+	int ret;
+
+	if (priv->mfp4_errb_disabled)
+		return 0;
+
+	ret = max9296a_update_bits(priv, MAX9296A_REG5,
+				   MAX9296A_REG5_LOCK_EN |
+				   MAX9296A_REG5_ERRB_EN,
+				   MAX9296A_REG5_LOCK_EN);
+	if (ret)
+		return ret;
+
+	priv->mfp4_errb_disabled = true;
+
+	return 0;
+}
+
+static int max9296a_mfp4_disable_errb_for_pin_use(struct max9296a_priv *priv)
+{
+	bool already_disabled = priv->mfp4_errb_disabled;
+	int ret;
+
+	ret = max9296a_mfp4_disable_errb(priv);
+	if (ret)
+		return ret;
+
+	if (!already_disabled)
+		dev_info(priv->dev,
+			 "MFP4 configured for non-ERRB use, ERRB disabled\n");
+
+	return 0;
+}
+
 static unsigned int max9296a_field_get(unsigned int val, unsigned int mask)
 {
 	return (val & mask) >> __ffs(mask);
@@ -1415,6 +1453,12 @@ static int max9296a_conf_pin_config_set_one(struct max9296a_priv *priv,
 			return ret;
 	}
 
+	if (offset == MAX9296A_MFP4_PIN) {
+		ret = max9296a_mfp4_disable_errb_for_pin_use(priv);
+		if (ret)
+			return ret;
+	}
+
 	return ret;
 }
 
@@ -1466,6 +1510,15 @@ static int max9296a_mux_get_groups(struct pinctrl_dev *pctldev,
 static int max9296a_mux_set(struct pinctrl_dev *pctldev, unsigned selector,
 				unsigned group)
 {
+	struct max9296a_priv *priv = pinctrl_dev_get_drvdata(pctldev);
+	const struct pingroup *grp = &max9296a_ctrl_groups[group];
+	unsigned int i;
+
+	for (i = 0; i < grp->npins; i++) {
+		if (grp->pins[i] == MAX9296A_MFP4_PIN)
+			return max9296a_mfp4_disable_errb_for_pin_use(priv);
+	}
+
 	return 0;
 }
 
@@ -1611,27 +1664,31 @@ static int max9296a_wait_for_device(struct max9296a_priv *priv)
 	return ret;
 }
 
-static int max9296a_x6_orn_mfp4_power_init(struct max9296a_priv *priv)
+static int max9296a_mfp4_power_output_high_init(struct max9296a_priv *priv)
 {
+	bool already_disabled = priv->mfp4_errb_disabled;
 	int ret;
 
 	ret = max9296a_write(priv, MAX9296A_MFP4_GPIO_A,
-			     MAX9296A_X6_ORN_MFP4_GPIO_A_VAL);
+			     MAX9296A_MFP4_POWER_GPIO_A_VAL);
 	if (ret)
 		return ret;
 
 	ret = max9296a_write(priv, MAX9296A_MFP4_GPIO_B,
-			     MAX9296A_X6_ORN_MFP4_GPIO_B_VAL);
+			     MAX9296A_MFP4_POWER_GPIO_B_VAL);
 	if (ret)
 		return ret;
 
-	ret = max9296a_write(priv, MAX9296A_REG5, MAX9296A_REG5_LOCK_EN);
+	ret = max9296a_mfp4_disable_errb(priv);
 	if (ret)
 		return ret;
 
 	msleep(50);
 
-	dev_info(priv->dev, "X6-ORN MFP4 power init applied, ERRB disabled\n");
+	if (already_disabled)
+		dev_info(priv->dev, "MFP4 power output enabled\n");
+	else
+		dev_info(priv->dev, "MFP4 power output enabled, ERRB disabled\n");
 
 	return 0;
 }
@@ -2397,8 +2454,8 @@ static int max9296a_probe(struct i2c_client *client)
 		return ret;
 
 	if (of_property_read_bool(dev->of_node,
-				  "maxim,x6-orn-mfp4-power-init")) {
-		ret = max9296a_x6_orn_mfp4_power_init(priv);
+				  "maxim,mfp4-power-output-high")) {
+		ret = max9296a_mfp4_power_output_high_init(priv);
 		if (ret)
 			return ret;
 	}
