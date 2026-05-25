@@ -1258,7 +1258,7 @@ static int max96717_wait_for_device(struct max96717_priv *priv)
 		if (ret >= 0)
 			return 0;
 
-		msleep(100);
+		msleep(70);
 
 		dev_dbg(priv->dev, "Retry %u waiting for serializer: %d\n", i, ret);
 	}
@@ -1519,6 +1519,10 @@ static int max96717_init(struct max_ser_priv *ser_priv)
 		if (ret)
 			return ret;
 		msleep(70);
+
+		ret = max96717_wait_for_device(priv);
+		if (ret)
+			return ret;
 	}
 
 	/* Disable ports. */
