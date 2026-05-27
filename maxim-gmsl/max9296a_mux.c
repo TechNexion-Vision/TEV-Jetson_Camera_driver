@@ -1748,6 +1748,12 @@ err_unregister_client:
 		}
 	}
 
+	/* Disable link auto-select and reset one shot */
+	ret = max9296a_update_bits(priv, 0x10, GENMASK(5, 4), 0x20);
+	if (ret)
+		return ret;
+	msleep(50);
+
 	return ret;
 }
 
@@ -2462,12 +2468,6 @@ static int max9296a_probe(struct i2c_client *client)
 	ret = devm_gpiochip_add_data(priv->dev, &priv->gc, priv);
 	if (ret)
 		return ret;
-
-	/* Disable link auto-select and reset one shot */
-	ret = max9296a_update_bits(priv, 0x10, GENMASK(5, 4), 0x20);
-	if (ret)
-		return ret;
-	msleep(50);
 
 	return max_des_probe(&priv->des_priv);
 }
