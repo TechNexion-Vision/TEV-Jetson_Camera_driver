@@ -205,8 +205,6 @@ static int max_des_i2c_mux_init(struct max_des_priv *priv)
 		if (!link->enabled)
 			continue;
 
-		priv->ops->select_links(priv, BIT(link->index));
-
 		ret = i2c_mux_add_adapter(priv->mux, 0, link->index, 0);
 		dev_info(priv->dev, "%s() link [%d]\n", __func__, link->index);
 		if (ret)
