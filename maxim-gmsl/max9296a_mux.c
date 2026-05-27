@@ -1777,12 +1777,78 @@ static int max9296a_mipi_enable(struct max_des_priv *des_priv, bool enable)
 	return 0;
 }
 
+static int max9296a_check_gmsl_links(struct max_des_priv *des_priv)
+{
+	struct max9296a_priv *priv = des_to_priv(des_priv);
+	unsigned int locked_links_mask = 0;
+	unsigned int links_mask = des_priv->gmsl_link_mask;
+	u16 link_lock_addr = 0x13;
+	u16 tmp_data;
+	unsigned long timeout;
+
+	dev_dbg(priv->dev, "%s(): links_mask [0x%x]\n", __func__, links_mask);
+
+	max9296a_update_bits(priv, 0x10, BIT(5) | GENMASK(1, 0),
+					BIT(5) | FIELD_PREP(GENMASK(1, 0), links_mask));
+
+	msleep(100);
+
+	timeout = jiffies + msecs_to_jiffies(100);
+
+	while (!time_after(jiffies, timeout)) {
+		int current_link = ffs(links_mask) - 1;
+
+		if (current_link == -1)
+			break;
+
+		tmp_data = max9296a_read(priv, link_lock_addr);
+
+		dev_dbg(priv->dev, "current_link [0x%x], tmp_data [0x%x]\n", current_link, tmp_data);
+		des_priv->links[current_link].enabled = false;
+		if ((tmp_data & BIT(3)) != BIT(3))
+			break;
+		else if ((tmp_data & BIT(current_link + 4)) == BIT(current_link + 4)) {
+			locked_links_mask |= BIT(current_link);
+			des_priv->links[current_link].enabled = true;
+		}
+
+		links_mask &= ~BIT(current_link);
+
+		if (!links_mask && des_priv->gmsl_link_mask == locked_links_mask)
+			break;
+		else if (!links_mask)
+			links_mask = des_priv->gmsl_link_mask & ~locked_links_mask;
+
+		usleep_range(1000, 2000);
+	}
+
+	return locked_links_mask;
+}
+
 static int max9296a_init(struct max_des_priv *des_priv)
 {
 	struct max9296a_priv *priv = des_to_priv(des_priv);
+	unsigned int locked_links;
+	int retries = 3;
 	int ret;
 
-	dev_dbg(priv->dev, "%s()\n", __func__);
+	while (retries--) {
+		locked_links = max9296a_check_gmsl_links(des_priv);
+		if (locked_links == des_priv->gmsl_link_mask)
+			break;
+
+		max9296a_update_bits(priv, 0x10, BIT(6), BIT(6));
+		usleep_range(2000, 2500);
+		max9296a_update_bits(priv, 0x10, BIT(6), 0);
+		usleep_range(2000, 2500);
+	}
+
+	if (locked_links == 0) {
+		dev_err(priv->dev, "No GMSL link has locked after 3 retries. Abort!\n");
+		return -ENODEV;
+	}
+
+	dev_info(priv->dev, "GMSL link has locked - mask [0x%x]\n", locked_links);
 
 	/* Disable all PHYs. */
 	ret = max9296a_update_bits(priv, 0x332, GENMASK(7, 4), 0x00);
