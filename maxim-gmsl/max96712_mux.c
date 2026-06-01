@@ -2361,19 +2361,6 @@ static int max96712_init_pipe(struct max_des_priv *des_priv,
 	int ret;
 
 	dev_dbg(priv->dev, "%s()\n", __func__);
-	/* Set destination PHY. */
-	shift = index * 2;
-	ret = max96712_update_bits(priv, 0x8ca, GENMASK(1, 0) << shift,
-				pipe->phy_id << shift);
-	if (ret)
-		return ret;
-
-	shift = 4;
-	reg = 0x939 + 0x40 * index;
-	ret = max96712_update_bits(priv, reg, GENMASK(1, 0) << shift,
-				pipe->phy_id << shift);
-	if (ret)
-		return ret;
 
 	/* Enable pipe. */
 	ret = max96712_update_bits(priv, 0xf4, BIT(index), BIT(index));
