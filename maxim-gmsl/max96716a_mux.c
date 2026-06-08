@@ -1793,9 +1793,10 @@ static int max96716a_check_gmsl_links(struct max_des_priv *des_priv)
 
 	dev_dbg(priv->dev, "%s()\n", __func__);
 
+	des_priv->ops->select_links(des_priv, links_mask);
 	max96716a_update_bits(priv, 0x10,
 					BIT(5) | GENMASK(1, 0),
-					BIT(5) | FIELD_PREP(GENMASK(1, 0), des_priv->gmsl_link_mask));
+					BIT(5) | FIELD_PREP(GENMASK(1, 0), links_mask));
 	max96716a_update_bits(priv, 0x12, BIT(5), BIT(5));
 
 	timeout = jiffies + msecs_to_jiffies(100);
@@ -1839,7 +1840,9 @@ static int max96716a_init(struct max_des_priv *des_priv)
 		if (locked_links == des_priv->gmsl_link_mask)
 			break;
 
-		max96716a_reset(priv);
+		max96716a_update_bits(priv, 0x10, BIT(6), BIT(6));
+		usleep_range(2000, 2500);
+		max96716a_update_bits(priv, 0x10, BIT(6), 0);
 		usleep_range(2000, 2500);
 	}
 
