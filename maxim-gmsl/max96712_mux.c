@@ -2112,7 +2112,9 @@ static int max96712_init(struct max_des_priv *des_priv)
 		if (locked_links == des_priv->gmsl_link_mask)
 			break;
 
-		max96712_reset(priv);
+		max96712_update_bits(priv, 0x18, GENMASK(7, 4), GENMASK(7, 4));
+		usleep_range(2000, 2500);
+		max96712_update_bits(priv, 0x18, GENMASK(7, 4), 0);
 		usleep_range(2000, 2500);
 	}
 
