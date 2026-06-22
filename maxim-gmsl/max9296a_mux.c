@@ -101,21 +101,6 @@ static inline struct max_des_subdev_priv *sd_to_max_des(struct v4l2_subdev *sd)
 	return container_of(sd, struct max_des_subdev_priv, sd);
 }
 
-static unsigned int max_des_enabled_links_mask(struct max_des_priv *priv)
-{
-	unsigned int i;
-	unsigned int mask = 0;
-
-	for (i = 0; i < priv->ops->num_links; i++) {
-		struct max_des_link *link = &priv->links[i];
-
-		if (link->enabled)
-			mask |= BIT(link->index);
-	}
-
-	return mask;
-}
-
 static int __max_des_mipi_update(struct max_des_priv *priv)
 {
 	struct max_des_subdev_priv *sd_priv;
@@ -162,13 +147,11 @@ exit:
 
 static int max_des_post_init(struct max_des_priv *priv)
 {
-	unsigned int mask;
 	int ret;
 
 	dev_dbg(priv->dev, "%s()\n", __func__);
 
-	mask = max_des_enabled_links_mask(priv);
-	ret = priv->ops->select_links(priv, mask);
+	ret = priv->ops->select_links(priv, priv->gmsl_link_mask);
 	if (ret)
 		return ret;
 
@@ -292,6 +275,13 @@ static int max_des_init(struct max_des_priv *priv)
 	ret = __max_des_mipi_update(priv);
 	if (ret)
 		return ret;
+
+	for (i = 0; i < priv->ops->num_links; i++) {
+		struct max_des_link *link = &priv->links[i];
+
+		if (link->enabled)
+			priv->gmsl_link_mask |= BIT(link->index);
+	}
 
 	ret = priv->ops->init(priv);
 	if (ret)
@@ -610,6 +600,7 @@ static int max_des_parse_i2c_dt(struct max_des_priv *priv)
 	struct device *dev = &priv->client->dev;
 	struct device_node *i2c_mux;
 	struct device_node *node = NULL;
+	unsigned int link_mask = 0;
 
 	dev_dbg(priv->dev, "%s()\n", __func__);
 
@@ -632,14 +623,14 @@ static int max_des_parse_i2c_dt(struct max_des_priv *priv)
 			continue;
 		}
 
-		priv->gmsl_link_mask |= BIT(id);
+		link_mask |= BIT(id);
 		priv->gmsl_links_used++;
 	}
 	of_node_put(node);
 	of_node_put(i2c_mux);
 	of_node_put(dev->of_node);
 
-	dev_info(priv->dev, "find [%d] node, mask [0x%x]\n", priv->gmsl_links_used, priv->gmsl_link_mask);
+	dev_info(priv->dev, "find [%d] node, mask [0x%x]\n", priv->gmsl_links_used, link_mask);
 
 	return 0;
 }
@@ -1786,8 +1777,7 @@ static int max9296a_check_gmsl_links(struct max_des_priv *des_priv)
 {
 	struct max9296a_priv *priv = des_to_priv(des_priv);
 	unsigned int locked_links_mask = 0;
-	unsigned int expected_links_mask = max_des_enabled_links_mask(des_priv);
-	unsigned int links_mask = expected_links_mask;
+	unsigned int links_mask = des_priv->gmsl_link_mask;
 	u16 link_lock_addr = 0x13;
 	u16 tmp_data;
 	unsigned long timeout;
@@ -1823,10 +1813,10 @@ static int max9296a_check_gmsl_links(struct max_des_priv *des_priv)
 
 		links_mask &= ~BIT(current_link);
 
-		if (!links_mask && expected_links_mask == locked_links_mask)
+		if (!links_mask && des_priv->gmsl_link_mask == locked_links_mask)
 			break;
 		else if (!links_mask)
-			links_mask = expected_links_mask & ~locked_links_mask;
+			links_mask = des_priv->gmsl_link_mask & ~locked_links_mask;
 
 		usleep_range(1000, 2000);
 	}
@@ -1843,7 +1833,7 @@ static int max9296a_init(struct max_des_priv *des_priv)
 
 	while (retries--) {
 		locked_links = max9296a_check_gmsl_links(des_priv);
-		if (locked_links == max_des_enabled_links_mask(des_priv))
+		if (locked_links == des_priv->gmsl_link_mask)
 			break;
 
 		max9296a_update_bits(priv, 0x10, BIT(6), BIT(6));
