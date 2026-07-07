@@ -2135,8 +2135,7 @@ error_out:
 	return ret;
 }
 
-static int tevs_probe(struct i2c_client *client,
-			const struct i2c_device_id *id)
+static int tevs_probe(struct i2c_client *client)
 {
 	struct tevs *tevs = NULL;
 	struct device *dev = &client->dev;
@@ -2217,14 +2216,14 @@ error_probe:
 	return ret;
 }
 
-static int tevs_remove(struct i2c_client *client)
+static void tevs_remove(struct i2c_client *client)
 {
 	struct camera_common_data *s_data = to_camera_common_data(&client->dev);
 	struct tevs *tevs = (struct tevs *)s_data->priv;
+
 	tevs_ctrls_free(tevs);
 	tegracam_v4l2subdev_unregister(tevs->tc_dev);
 	tegracam_device_unregister(tevs->tc_dev);
-	return 0;
 }
 
 static const struct i2c_device_id sensor_id[] = { { DRIVER_NAME, 0 }, {} };

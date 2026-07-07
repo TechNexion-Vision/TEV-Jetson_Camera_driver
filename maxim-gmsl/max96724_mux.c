@@ -1190,24 +1190,24 @@ enum max96724_pinctrl_params {
 };
 
 static const struct pinconf_generic_params max96724_cfg_params[] = {
-	{ "maxim,pull-strength-weak", MAX96724_PINCTRL_PULL_STRENGTH_WEAK, 0 },
-	{ "maxim,jitter-compensation", MAX96724_PINCTRL_JITTER_COMPENSATION_EN, 0 },
-	{ "maxim,gmsl-tx-a", MAX96724_PINCTRL_GMSL_TX_EN_A, 0 },
-	{ "maxim,gmsl-rx-a", MAX96724_PINCTRL_GMSL_RX_EN_A, 0 },
-	{ "maxim,gmsl-tx-id-a", MAX96724_PINCTRL_GMSL_TX_ID_A, 0 },
-	{ "maxim,gmsl-rx-id-a", MAX96724_PINCTRL_GMSL_RX_ID_A, 0 },
-	{ "maxim,gmsl-tx-b", MAX96724_PINCTRL_GMSL_TX_EN_B, 0 },
-	{ "maxim,gmsl-rx-b", MAX96724_PINCTRL_GMSL_RX_EN_B, 0 },
-	{ "maxim,gmsl-tx-id-b", MAX96724_PINCTRL_GMSL_TX_ID_B, 0 },
-	{ "maxim,gmsl-rx-id-b", MAX96724_PINCTRL_GMSL_RX_ID_B, 0 },
-	{ "maxim,gmsl-tx-c", MAX96724_PINCTRL_GMSL_TX_EN_C, 0 },
-	{ "maxim,gmsl-rx-c", MAX96724_PINCTRL_GMSL_RX_EN_C, 0 },
-	{ "maxim,gmsl-tx-id-c", MAX96724_PINCTRL_GMSL_TX_ID_C, 0 },
-	{ "maxim,gmsl-rx-id-c", MAX96724_PINCTRL_GMSL_RX_ID_C, 0 },
-	{ "maxim,gmsl-tx-d", MAX96724_PINCTRL_GMSL_TX_EN_D, 0 },
-	{ "maxim,gmsl-rx-d", MAX96724_PINCTRL_GMSL_RX_EN_D, 0 },
-	{ "maxim,gmsl-tx-id-d", MAX96724_PINCTRL_GMSL_TX_ID_D, 0 },
-	{ "maxim,gmsl-rx-id-d", MAX96724_PINCTRL_GMSL_RX_ID_D, 0 },
+	{ "maxim,pull-strength-weak", MAX_PINCONF_PARAM(MAX96724_PINCTRL_PULL_STRENGTH_WEAK), 0 },
+	{ "maxim,jitter-compensation", MAX_PINCONF_PARAM(MAX96724_PINCTRL_JITTER_COMPENSATION_EN), 0 },
+	{ "maxim,gmsl-tx-a", MAX_PINCONF_PARAM(MAX96724_PINCTRL_GMSL_TX_EN_A), 0 },
+	{ "maxim,gmsl-rx-a", MAX_PINCONF_PARAM(MAX96724_PINCTRL_GMSL_RX_EN_A), 0 },
+	{ "maxim,gmsl-tx-id-a", MAX_PINCONF_PARAM(MAX96724_PINCTRL_GMSL_TX_ID_A), 0 },
+	{ "maxim,gmsl-rx-id-a", MAX_PINCONF_PARAM(MAX96724_PINCTRL_GMSL_RX_ID_A), 0 },
+	{ "maxim,gmsl-tx-b", MAX_PINCONF_PARAM(MAX96724_PINCTRL_GMSL_TX_EN_B), 0 },
+	{ "maxim,gmsl-rx-b", MAX_PINCONF_PARAM(MAX96724_PINCTRL_GMSL_RX_EN_B), 0 },
+	{ "maxim,gmsl-tx-id-b", MAX_PINCONF_PARAM(MAX96724_PINCTRL_GMSL_TX_ID_B), 0 },
+	{ "maxim,gmsl-rx-id-b", MAX_PINCONF_PARAM(MAX96724_PINCTRL_GMSL_RX_ID_B), 0 },
+	{ "maxim,gmsl-tx-c", MAX_PINCONF_PARAM(MAX96724_PINCTRL_GMSL_TX_EN_C), 0 },
+	{ "maxim,gmsl-rx-c", MAX_PINCONF_PARAM(MAX96724_PINCTRL_GMSL_RX_EN_C), 0 },
+	{ "maxim,gmsl-tx-id-c", MAX_PINCONF_PARAM(MAX96724_PINCTRL_GMSL_TX_ID_C), 0 },
+	{ "maxim,gmsl-rx-id-c", MAX_PINCONF_PARAM(MAX96724_PINCTRL_GMSL_RX_ID_C), 0 },
+	{ "maxim,gmsl-tx-d", MAX_PINCONF_PARAM(MAX96724_PINCTRL_GMSL_TX_EN_D), 0 },
+	{ "maxim,gmsl-rx-d", MAX_PINCONF_PARAM(MAX96724_PINCTRL_GMSL_RX_EN_D), 0 },
+	{ "maxim,gmsl-tx-id-d", MAX_PINCONF_PARAM(MAX96724_PINCTRL_GMSL_TX_ID_D), 0 },
+	{ "maxim,gmsl-rx-id-d", MAX_PINCONF_PARAM(MAX96724_PINCTRL_GMSL_RX_ID_D), 0 },
 };
 
 static int max96724_ctrl_get_groups_count(struct pinctrl_dev *pctldev)
@@ -1724,7 +1724,7 @@ static int max96724_gpio_direction_output(struct gpio_chip *gc,
 static int max96724_gpio_get(struct gpio_chip *gc, unsigned int offset)
 {
 	unsigned long config =
-		pinconf_to_config_packed(MAX96724_PINCTRL_INPUT_VALUE, 0);
+		pinconf_to_config_packed(MAX_PINCONF_PARAM(MAX96724_PINCTRL_INPUT_VALUE), 0);
 	struct max96724_priv *priv = gpiochip_get_data(gc);
 	int ret;
 
@@ -2697,11 +2697,11 @@ static int max96724_probe(struct i2c_client *client)
 	return max_des_probe(&priv->des_priv);
 }
 
-static int max96724_remove(struct i2c_client *client)
+static void max96724_remove(struct i2c_client *client)
 {
 	struct max96724_priv *priv = i2c_get_clientdata(client);
 
-	return max_des_remove(&priv->des_priv);
+	max_des_remove(&priv->des_priv);
 }
 
 static const struct of_device_id max96724_of_table[] = {
@@ -2715,7 +2715,7 @@ static struct i2c_driver max96724_i2c_driver = {
 		.name = MAX96724_NAME,
 		.of_match_table	= of_match_ptr(max96724_of_table),
 	},
-	.probe_new = max96724_probe,
+	.probe = max96724_probe,
 	.remove = max96724_remove,
 };
 

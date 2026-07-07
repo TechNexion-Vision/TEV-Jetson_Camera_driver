@@ -3,21 +3,35 @@
 *
 */
 
+#include <linux/version.h>
+#include <linux/pinctrl/pinctrl.h>
+
+#include <media/v4l2-async.h>
 #include <media/v4l2-fwnode.h>
+#include <media/v4l2-mediabus.h>
 #include <media/v4l2-subdev.h>
 
 #ifndef MAX_SERDES_H
 #define MAX_SERDES_H
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 8, 0)
 #define v4l2_async_nf_init v4l2_async_notifier_init
 #define v4l2_async_nf_unregister v4l2_async_notifier_unregister
 #define v4l2_async_nf_cleanup v4l2_async_notifier_cleanup
 #define v4l2_async_subdev_nf_register v4l2_async_subdev_notifier_register
 #define v4l2_async_nf_add_fwnode(notifier, fwnode, type)		\
 	((type *)v4l2_async_notifier_add_fwnode_subdev(notifier, fwnode, sizeof(type)))
+#endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 8, 0)
 #define v4l2_mbus_config_mipi_csi2 v4l2_fwnode_bus_mipi_csi2
+#else
+#define v4l2_fwnode_bus_mipi_csi2 v4l2_mbus_config_mipi_csi2
+#endif
 
+#define MAX_PINCONF_PARAM(_param) ((enum pin_config_param)(_param))
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 8, 0)
 struct pingroup {
 	const char *name;
 	const unsigned int *pins;
@@ -43,6 +57,7 @@ struct pinfunction {
 		.groups = (_groups),			\
 		.ngroups = (_ngroups),			\
 	}
+#endif
 
 #define MAX_SERDES_STREAMS_NUM     4
 #define MAX_SERDES_VC_ID_NUM	   4

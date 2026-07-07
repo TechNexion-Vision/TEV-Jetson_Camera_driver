@@ -28,7 +28,11 @@ const struct regmap_config max_ser_i2c_regmap = {
 };
 
 struct max_ser_asd {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 8, 0)
+	struct v4l2_async_connection base;
+#else
 	struct v4l2_async_subdev base;
+#endif
 	struct max_ser_subdev_priv *sd_priv;
 };
 
