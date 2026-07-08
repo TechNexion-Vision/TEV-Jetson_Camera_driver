@@ -432,7 +432,7 @@ static int vls3_configure_des_csi(struct vls3_st *this)
 	return 0;
 }
 
-static int vls3_probe(struct i2c_client *client, const struct i2c_device_id *id)
+static int vls3_probe(struct i2c_client *client)
 {
 	struct vls3_st *obj = NULL;
 	u32 temp;
@@ -520,9 +520,8 @@ static int vls3_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	return 0;
 }
 
-static int vls3_remove(struct i2c_client *client)
+static void vls3_remove(struct i2c_client *client)
 {
-	return 0;
 }
 
 static const struct i2c_device_id vls3_id[] = {
