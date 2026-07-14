@@ -1796,9 +1796,9 @@ static int tevs_start_streaming(struct tegracam_device *tc_dev)
 	if (!(tevs_check_trigger_mode(tevs) | tevs->hw_reset_mode))
 		ret = tevs_standby(tevs, 0);
 
-	fps = *tevs_sensor_table[tevs->selected_sensor]
+	fps = tevs_sensor_table[tevs->selected_sensor]
 			  .frmfmt[tevs->selected_mode]
-			  .framerates;
+			  .framerates[0];
 	dev_dbg(tc_dev->dev, "%s() width=%d, height=%d, mode=%d\n",
 		__func__,
 		tevs_sensor_table[tevs->selected_sensor]
