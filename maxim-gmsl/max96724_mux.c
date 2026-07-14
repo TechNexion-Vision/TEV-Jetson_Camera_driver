@@ -1069,9 +1069,16 @@ static int max_des_remove(struct max_des_priv *priv)
 static int max96724_read(struct max96724_priv *priv, int reg)
 {
 	int ret, val;
+	int cnt = 3;
 
-	ret = regmap_read(priv->regmap, reg, &val);
-	dev_dbg(priv->dev, "%s(): read %d 0x%x = 0x%02x\n", __func__, ret, reg, val);
+	while (cnt--) {
+		ret = regmap_read(priv->regmap, reg, &val);
+		dev_dbg(priv->dev, "%s(): read %d 0x%x = 0x%02x\n", __func__, ret, reg, val);
+		if (!ret) {
+			break;
+		}
+		dev_dbg(priv->dev, "%s(): retry %d\n", __func__, cnt);
+	}
 
 	if (ret) {
 		dev_err(priv->dev, "read 0x%04x failed\n", reg);
@@ -1084,9 +1091,16 @@ static int max96724_read(struct max96724_priv *priv, int reg)
 static int max96724_write(struct max96724_priv *priv, unsigned int reg, u8 val)
 {
 	int ret;
+	int cnt = 3;
 
-	ret = regmap_write(priv->regmap, reg, val);
-	dev_dbg(priv->dev, "%s(): write %d 0x%x = 0x%02x\n", __func__, ret, reg, val);
+	while (cnt--) {
+		ret = regmap_write(priv->regmap, reg, val);
+		dev_dbg(priv->dev, "%s(): write %d 0x%x = 0x%02x\n", __func__, ret, reg, val);
+		if (!ret) {
+			break;
+		}
+		dev_dbg(priv->dev, "%s(): retry %d\n", __func__, cnt);
+	}
 
 	if (ret)
 		dev_err(priv->dev, "write 0x%04x failed\n", reg);
@@ -1098,9 +1112,16 @@ static int max96724_update_bits(struct max96724_priv *priv, unsigned int reg,
 					u8 mask, u8 val)
 {
 	int ret;
+	int cnt = 3;
 
-	ret = regmap_update_bits(priv->regmap, reg, mask, val);
-	dev_dbg(priv->dev, "%s(): update %d 0x%x 0x%02x = 0x%02x\n", __func__, ret, reg, mask, val);
+	while (cnt--) {
+		ret = regmap_update_bits(priv->regmap, reg, mask, val);
+		dev_dbg(priv->dev, "%s(): update %d 0x%x 0x%02x = 0x%02x\n", __func__, ret, reg, mask, val);
+		if (!ret) {
+			break;
+		}
+		dev_dbg(priv->dev, "%s(): retry %d\n", __func__, cnt);
+	}
 
 	if (ret)
 		dev_err(priv->dev, "update 0x%04x failed\n", reg);
