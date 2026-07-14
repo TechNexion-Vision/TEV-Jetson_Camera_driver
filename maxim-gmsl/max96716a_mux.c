@@ -1085,24 +1085,37 @@ static int max_des_remove(struct max_des_priv *priv)
 static int max96716a_read(struct max96716a_priv *priv, int reg)
 {
 	int ret, val;
+	int cnt = 3;
 
-	ret = regmap_read(priv->regmap, reg, &val);
-	dev_dbg(priv->dev, "%s(): read %d 0x%x = 0x%02x\n", __func__, ret, reg, val);
+	while (cnt--) {
+		ret = regmap_read(priv->regmap, reg, &val);
+		dev_dbg(priv->dev, "%s(): read %d 0x%x = 0x%02x\n", __func__, ret, reg, val);
+		if (!ret) {
+			break;
+		}
+		dev_dbg(priv->dev, "%s(): retry %d\n", __func__, cnt);
+	}
 
 	if (ret) {
 		dev_err(priv->dev, "read 0x%04x failed\n", reg);
 		return ret;
 	}
-
 	return val;
 }
 
 static int max96716a_write(struct max96716a_priv *priv, unsigned int reg, u8 val)
 {
 	int ret;
+	int cnt = 3;
 
-	ret = regmap_write(priv->regmap, reg, val);
-	dev_dbg(priv->dev, "%s(): write %d 0x%x = 0x%02x\n", __func__, ret, reg, val);
+	while (cnt--) {
+		ret = regmap_write(priv->regmap, reg, val);
+		dev_dbg(priv->dev, "%s(): write %d 0x%x = 0x%02x\n", __func__, ret, reg, val);
+		if (!ret) {
+			break;
+		}
+		dev_dbg(priv->dev, "%s(): retry %d\n", __func__, cnt);
+	}
 
 	if (ret)
 		dev_err(priv->dev, "write 0x%04x failed\n", reg);
@@ -1114,9 +1127,16 @@ static int max96716a_update_bits(struct max96716a_priv *priv, unsigned int reg,
 					u8 mask, u8 val)
 {
 	int ret;
+	int cnt = 3;
 
-	ret = regmap_update_bits(priv->regmap, reg, mask, val);
-	dev_dbg(priv->dev, "%s(): update %d 0x%x 0x%02x = 0x%02x\n", __func__, ret, reg, mask, val);
+	while (cnt--) {
+		ret = regmap_update_bits(priv->regmap, reg, mask, val);
+		dev_dbg(priv->dev, "%s(): update %d 0x%x 0x%02x = 0x%02x\n", __func__, ret, reg, mask, val);
+		if (!ret) {
+			break;
+		}
+		dev_dbg(priv->dev, "%s(): retry %d\n", __func__, cnt);
+	}
 
 	if (ret)
 		dev_err(priv->dev, "update 0x%04x failed\n", reg);
@@ -1709,13 +1729,13 @@ static int max96716a_reset(struct max96716a_priv *priv)
 		}
 
 		dev_info(priv->dev, "change addr to 0x%x\n", client->addr);
-		regmap_update_bits(priv->regmap, 0x5b, GENMASK(2, 0), priv->source_id);
-		regmap_update_bits(priv->regmap, 0x63, GENMASK(2, 0), priv->source_id);
-		regmap_update_bits(priv->regmap, 0x6b, GENMASK(2, 0), priv->source_id);
-		regmap_update_bits(priv->regmap, 0x73, GENMASK(2, 0), priv->source_id);
-		regmap_update_bits(priv->regmap, 0x7b, GENMASK(2, 0), priv->source_id);
-		regmap_update_bits(priv->regmap, 0x83, GENMASK(2, 0), priv->source_id);
-		regmap_update_bits(priv->regmap, 0x8b, GENMASK(2, 0), priv->source_id);
+		max96716a_update_bits(priv, 0x5b, GENMASK(2, 0), priv->source_id);
+		max96716a_update_bits(priv, 0x63, GENMASK(2, 0), priv->source_id);
+		max96716a_update_bits(priv, 0x6b, GENMASK(2, 0), priv->source_id);
+		max96716a_update_bits(priv, 0x73, GENMASK(2, 0), priv->source_id);
+		max96716a_update_bits(priv, 0x7b, GENMASK(2, 0), priv->source_id);
+		max96716a_update_bits(priv, 0x83, GENMASK(2, 0), priv->source_id);
+		max96716a_update_bits(priv, 0x8b, GENMASK(2, 0), priv->source_id);
 
 err_regmap_exit:
 		regmap_exit(regmap);
