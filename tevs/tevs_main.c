@@ -289,6 +289,8 @@
 #define TEVS_LINK_FREQUENCY_DEFAULT			400000000ull
 #define TEVS_PIXEL_RATE_DEFAULT				200000000ull
 
+#define TEVS_CONTINUOUS_CLOCK_DEFAULT 		(0)
+
 struct header_info {
 	u8 header_version;
 	u16 content_offset;
@@ -1895,7 +1897,13 @@ static int tevs_stop_streaming(struct tegracam_device *tc_dev)
 	int ret = 0;
 
 	if (!(tevs_check_trigger_mode(tevs) | tevs->hw_reset_mode))
-			ret = tevs_standby(tevs, 1);
+		ret = tevs_standby(tevs, 1);
+
+	if (tevs->continuous_clock) {
+		ret += tevs_i2c_write_16b(tevs,
+				HOST_COMMAND_ISP_CTRL_PREVIEW_HINF_CTRL,
+				0x10 | (TEVS_CONTINUOUS_CLOCK_DEFAULT << 5) | (tevs->data_lanes));
+	}
 	return ret;
 }
 
@@ -2119,7 +2127,8 @@ static int tevs_setup(struct tevs *tevs)
 		goto error_out;
 	}
 
-	tevs->continuous_clock = ~(ep_cfg.bus.mipi_csi2.flags) & V4L2_MBUS_CSI2_NONCONTINUOUS_CLOCK;
+	tevs->continuous_clock = !(ep_cfg.bus.mipi_csi2.flags &
+				 V4L2_MBUS_CSI2_NONCONTINUOUS_CLOCK);
 
 	dev_dbg(tevs->dev,
 		"data-lanes [%d] ,continuous-clock [%d],"
@@ -2313,6 +2322,12 @@ static int tevs_probe(struct i2c_client *client)
 
 	if (!(tevs_check_trigger_mode(tevs) | tevs->hw_reset_mode)) {
 		ret = tevs_standby(tevs, 1);
+
+		if (tevs->continuous_clock) {
+			ret += tevs_i2c_write_16b(tevs,
+					HOST_COMMAND_ISP_CTRL_PREVIEW_HINF_CTRL,
+					0x10 | (TEVS_CONTINUOUS_CLOCK_DEFAULT << 5) | (tevs->data_lanes));
+		}
 		if (ret != 0) {
 			dev_err(tevs->dev, "set standby mode failed\n");
 			return ret;
