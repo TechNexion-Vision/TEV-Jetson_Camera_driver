@@ -322,7 +322,10 @@ struct tevs {
 	struct gpio_desc *reset_gpio;
 	struct gpio_desc *standby_gpio;
 
-    u16 chip_id;
+	struct v4l2_subdev_ops subdev_ops;
+	struct v4l2_subdev_video_ops video_ops;
+
+	u16 chip_id;
 	int data_lanes;
 	int continuous_clock;
 	int data_frequency;
@@ -332,6 +335,7 @@ struct tevs {
 	int trigger_mode;
 	char *sensor_name;
 	int vc_id;
+	unsigned int fps;
 
 	struct mutex lock; /* Protects formats */
 	/* V4L2 Controls */
@@ -979,6 +983,10 @@ static int tevs_set_max_fps(struct tevs *tevs, s32 value)
 	ret += tevs_i2c_read(tevs, TEVS_AE_MANUAL_EXP_TIME, exp, 4);
 	tevs->exp_time->cur.val = be32_to_cpup((__be32 *)exp) &
 				  TEVS_AE_MANUAL_EXP_TIME_MASK;
+
+	if (!ret)
+		tevs->fps = value;
+
 	return ret;
 }
 
@@ -1751,6 +1759,24 @@ static struct camera_common_pdata *tevs_parse_dt(
 	return board_priv_pdata;
 }
 
+static bool tevs_fps_is_supported(struct tevs *tevs, unsigned int mode,
+				  unsigned int fps)
+{
+	const struct camera_common_frmfmt *fmt;
+	unsigned int i;
+
+	if (mode >= tevs_sensor_table[tevs->selected_sensor].res_list_size)
+		return false;
+
+	fmt = &tevs_sensor_table[tevs->selected_sensor].frmfmt[mode];
+	for (i = 0; i < fmt->num_framerates; i++) {
+		if (fmt->framerates[i] == fps)
+			return true;
+	}
+
+	return false;
+}
+
 static int tevs_set_mode(struct tegracam_device *tc_dev)
 {
 	struct camera_common_data *s_data = tc_dev->s_data;
@@ -1767,8 +1793,8 @@ static int tevs_set_mode(struct tegracam_device *tc_dev)
 		s_data->fmt_height);
 
 	for (i = 0 ; i < tevs_sensor_table[tevs->selected_sensor].res_list_size ; i++) {
-		if (tc_dev->s_data->fmt_width == tevs_sensor_table[tevs->selected_sensor].frmfmt[i].size.width &&
-				tc_dev->s_data->fmt_height == tevs_sensor_table[tevs->selected_sensor].frmfmt[i].size.height)
+		if (s_data->fmt_width == tevs_sensor_table[tevs->selected_sensor].frmfmt[i].size.width &&
+			s_data->fmt_height == tevs_sensor_table[tevs->selected_sensor].frmfmt[i].size.height)
 			break;
 	}
 
@@ -1778,13 +1804,16 @@ static int tevs_set_mode(struct tegracam_device *tc_dev)
 
 	tevs->selected_mode = i;
 
+	if (!tevs_fps_is_supported(tevs, tevs->selected_mode, tevs->fps))
+		tevs->fps = tevs_sensor_table[tevs->selected_sensor]
+				    .frmfmt[tevs->selected_mode].framerates[0];
+
 	return 0;
 }
 
 static int tevs_start_streaming(struct tegracam_device *tc_dev)
 {
 	struct tevs *tevs = tc_dev->priv;
-	int fps;
 	int ret = 0;
 	u8 exp[4] = { 0 };
 	dev_dbg(tc_dev->dev, "%s()\n", __func__);
@@ -1796,9 +1825,6 @@ static int tevs_start_streaming(struct tegracam_device *tc_dev)
 	if (!(tevs_check_trigger_mode(tevs) | tevs->hw_reset_mode))
 		ret = tevs_standby(tevs, 0);
 
-	fps = tevs_sensor_table[tevs->selected_sensor]
-			  .frmfmt[tevs->selected_mode]
-			  .framerates[0];
 	dev_dbg(tc_dev->dev, "%s() width=%d, height=%d, mode=%d\n",
 		__func__,
 		tevs_sensor_table[tevs->selected_sensor]
@@ -1847,9 +1873,9 @@ static int tevs_start_streaming(struct tegracam_device *tc_dev)
 			.size.height);
 	tevs_i2c_write_16b(
 				tevs, HOST_COMMAND_ISP_CTRL_PREVIEW_MAX_FPS,
-				fps);
+				tevs->fps);
 	if (tevs->max_fps)
-		tevs->max_fps->cur.val = fps;
+		tevs->max_fps->cur.val = tevs->fps;
 	tevs_i2c_read(tevs, TEVS_AE_MANUAL_EXP_TIME, exp, 4);
 	tevs->exp_time->cur.val = be32_to_cpup((__be32 *)exp) &
 			TEVS_AE_MANUAL_EXP_TIME_MASK;
@@ -1896,6 +1922,60 @@ static inline int tevs_write_reg(struct camera_common_data *s_data,
 			__func__, addr, val);
 
 	return err;
+}
+
+static int tevs_g_frame_interval(struct v4l2_subdev *sd,
+				 struct v4l2_subdev_frame_interval *interval)
+{
+	struct camera_common_data *s_data =
+		to_camera_common_data(sd->dev);
+	struct tevs *tevs = s_data ? s_data->priv : NULL;
+
+	if (!tevs->fps)
+		return -EINVAL;
+
+	interval->interval.numerator = 1;
+	interval->interval.denominator = tevs->fps;
+
+	dev_dbg(s_data->dev, "%s: fps = %d\n", __func__, tevs->fps);
+
+	return 0;
+}
+
+static int tevs_s_frame_interval(struct v4l2_subdev *sd,
+				 struct v4l2_subdev_frame_interval *interval)
+{
+	struct camera_common_data *s_data =
+		to_camera_common_data(sd->dev);
+	struct tevs *tevs = s_data ? s_data->priv : NULL;
+	unsigned int fps;
+	int ret;
+
+	if (!interval->interval.numerator ||
+	    !interval->interval.denominator)
+		return -EINVAL;
+
+	if (interval->interval.denominator % interval->interval.numerator)
+		return -EINVAL;
+
+	fps = interval->interval.denominator / interval->interval.numerator;
+	if (!tevs_fps_is_supported(tevs, s_data->mode_prop_idx, fps))
+		return -EINVAL;
+
+	if (tevs->tc_dev->is_streaming) {
+		ret = tevs_set_max_fps(tevs, fps);
+		if (ret)
+			return ret;
+	} else {
+		tevs->fps = fps;
+	}
+
+	interval->interval.numerator = 1;
+	interval->interval.denominator = fps;
+
+	dev_dbg(s_data->dev, "%s: fps = %d\n", __func__, tevs->fps);
+
+	return 0;
 }
 
 static struct camera_common_sensor_ops tevs_common_ops = {
@@ -2122,6 +2202,7 @@ static int tevs_setup(struct tevs *tevs)
 	tevs->s_data->frmfmt = tevs_sensor_table[tevs->selected_sensor].frmfmt;
 	tevs->s_data->numfmts =
 			tevs_sensor_table[tevs->selected_sensor].res_list_size;
+	tevs->fps = tevs_sensor_table[tevs->selected_sensor].frmfmt[0].framerates[0];
 
 	if ((ret = tevs_init_setting(tevs)) != 0) {
 		dev_err(tevs->dev, "init setting failed\n");
@@ -2133,6 +2214,28 @@ error_out:
 	fwnode_handle_put(ep);
 
 	return ret;
+}
+
+/*
+ * tegracam_v4l2 uses the same getter for both g_frame_interval and
+ * s_frame_interval.  Keep the shared tegracam operations, but override the
+ * two frame-interval callbacks for TEVS so VIDIOC_S_PARM reaches the sensor.
+ */
+static int tevs_install_frame_interval_ops(struct tevs *tevs)
+{
+	struct v4l2_subdev *sd = tevs->v4l2_subdev;
+
+	if (!sd->ops || !sd->ops->video)
+		return -EINVAL;
+
+	tevs->subdev_ops = *sd->ops;
+	tevs->video_ops = *sd->ops->video;
+	tevs->video_ops.g_frame_interval = tevs_g_frame_interval;
+	tevs->video_ops.s_frame_interval = tevs_s_frame_interval;
+	tevs->subdev_ops.video = &tevs->video_ops;
+	sd->ops = &tevs->subdev_ops;
+
+	return 0;
 }
 
 static int tevs_probe(struct i2c_client *client)
@@ -2189,6 +2292,17 @@ static int tevs_probe(struct i2c_client *client)
 	if (ret) {
 		dev_err(dev, "tegra camera subdev registration failed\n");
 		return ret;
+	}
+
+	/*
+	 * tegracam_v4l2 uses the same getter for both g_frame_interval and
+	 * s_frame_interval.  Keep the shared tegracam operations, but override the
+	 * two frame-interval callbacks for TEVS so VIDIOC_S_PARM reaches the sensor.
+	 */
+	ret = tevs_install_frame_interval_ops(tevs);
+	if (ret) {
+		dev_err(dev, "failed to install frame interval operations\n");
+		goto error_probe;
 	}
 
 	ret = tevs_ctrls_init(tevs);
