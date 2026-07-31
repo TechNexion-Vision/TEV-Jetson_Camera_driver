@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
-*
-*/
+ */
 
+#include <linux/list.h>
 #include <linux/i2c.h>
 #include <linux/i2c-mux.h>
 #include <linux/regmap.h>
@@ -19,13 +19,20 @@
 #define MAX_SER_SINK_PAD	1
 #define MAX_SER_PAD_NUM		2
 
-#define MAX_SER_MAX96717_DEV_ID			0xbf
+#define MAX_SER_REG0					0x0
+#define MAX_SER_REG0_DEV_ADDR			GENMASK(7, 1)
 
-const struct regmap_config max_ser_i2c_regmap = {
-	.reg_bits = 16,
-	.val_bits = 8,
-	.max_register = 0xffff,
-};
+#define MAX_SER_CTRL0					0x10
+#define MAX_SER_CTRL0_RESET_ALL			BIT(7)
+
+#define MAX_SER_CFGI_INFOFR_TR3			0x7b
+#define MAX_SER_CFGL_SPI_TR3			0x83
+#define MAX_SER_CFGL_GPIO_TR3			0x93
+#define MAX_SER_CFGL_IIC_X_TR3			0xa3
+#define MAX_SER_CFGL_IIC_Y_TR3			0xab
+#define MAX_SER_CFGI_TX_SRC_ID			GENMASK(2, 0)
+
+extern const struct regmap_config max_ser_i2c_regmap;
 
 struct max_ser_asd {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 8, 0)
@@ -39,7 +46,6 @@ struct max_ser_asd {
 struct max_ser_subdev_priv {
 	struct v4l2_subdev sd;
 	unsigned int index;
-	// struct fwnode_handle *fwnode;
 	struct device_node *node;
 
 	struct max_ser_priv *priv;
@@ -88,14 +94,14 @@ struct max_ser_ops {
 
 	int (*log_status)(struct max_ser_priv *priv, const char *name);
 	int (*log_pipe_status)(struct max_ser_priv *priv, struct max_ser_pipe *pipe,
-				const char *name);
+			       const char *name);
 	int (*log_phy_status)(struct max_ser_priv *priv, struct max_ser_phy *phy,
-				const char *name);
+			      const char *name);
 	int (*set_pipe_enable)(struct max_ser_priv *priv, struct max_ser_pipe *pipe, bool enable);
 	int (*update_pipe_dts)(struct max_ser_priv *priv, struct max_ser_pipe *pipe);
 	int (*update_pipe_vcs)(struct max_ser_priv *priv, struct max_ser_pipe *pipe);
 	int (*init)(struct max_ser_priv *priv);
-	int (*init_i2c_xlate)(struct max_ser_priv *priv);
+	int (*init_i2c_xlate)(struct max_ser_priv *priv, unsigned int i);
 	int (*init_phy)(struct max_ser_priv *priv, struct max_ser_phy *phy);
 	int (*init_pipe)(struct max_ser_priv *priv, struct max_ser_pipe *pipe);
 	int (*post_init)(struct max_ser_priv *priv);
@@ -108,11 +114,11 @@ struct max_ser_priv {
 	struct i2c_client *client;
 	struct regmap *regmap;
 
-	// struct i2c_atr *atr;
 	struct i2c_mux_core *mux;
 
 	unsigned int num_subdevs;
 	struct mutex lock;
+	struct list_head registry_node;
 	bool tunnel_mode;
 
 	struct max_i2c_xlate *i2c_xlates;
@@ -123,8 +129,28 @@ struct max_ser_priv {
 	struct max_ser_subdev_priv *sd_privs;
 };
 
+int max_ser_update_pipe_dts(struct max_ser_priv *priv,
+				   struct max_ser_pipe *pipe);
+
+int max_ser_ch_enable(struct max_ser_subdev_priv *sd_priv, bool enable);
+
+int max_ser_probe(struct max_ser_priv *priv);
+
+int max_ser_remove(struct max_ser_priv *priv);
+
+int max_ser_reset(struct regmap *regmap);
+
+int max_ser_wait_for_multiple(struct i2c_client *client, struct regmap *regmap,
+				   u8 *addrs, unsigned int num_addrs);
+
+int max_ser_wait(struct i2c_client *client, struct regmap *regmap, u8 addr);
+
+int max_ser_change_address(struct i2c_client *client, struct regmap *regmap, u8 addr);
+
+int max_ser_fix_tx_ids(struct regmap *regmap, u8 addr);
+
 static inline struct max_ser_pipe *max_ser_pipe_by_id(struct max_ser_priv *priv,
-							unsigned int index)
+						      unsigned int index)
 {
 	return &priv->pipes[index];
 }
@@ -135,19 +161,19 @@ static inline struct max_ser_pipe *max_ser_ch_pipe(struct max_ser_subdev_priv *s
 }
 
 static inline struct max_ser_phy *max_ser_phy_by_id(struct max_ser_priv *priv,
-							unsigned int index)
+						    unsigned int index)
 {
 	return &priv->phys[index];
 }
 
 static inline struct max_ser_phy *max_ser_pipe_phy(struct max_ser_priv *priv,
-						struct max_ser_pipe *pipe)
+						   struct max_ser_pipe *pipe)
 {
 	return max_ser_phy_by_id(priv, pipe->phy_id);
 }
 
 static inline struct max_ser_phy *max_ser_phy_by_pipe_id(struct max_ser_priv *priv,
-							unsigned int index)
+							 unsigned int index)
 {
 	struct max_ser_pipe *pipe = max_ser_pipe_by_id(priv, index);
 

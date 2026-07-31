@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
-*
-*/
+ */
 
+#include <linux/list.h>
 #include <linux/i2c-mux.h>
 
 #include <media/v4l2-ctrls.h>
@@ -20,12 +20,6 @@
 #define MAX_DES_SOURCE_PAD		0
 #define MAX_DES_SINK_PAD		1
 #define MAX_DES_PAD_NUM			2
-
-const struct regmap_config max_des_i2c_regmap = {
-	.reg_bits = 16,
-	.val_bits = 8,
-	.max_register = 0xffff,
-};
 
 struct max_des_asd {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 8, 0)
@@ -122,10 +116,12 @@ struct max_des_ops {
 
 	int (*log_status)(struct max_des_priv *priv, const char *name);
 	int (*log_pipe_status)(struct max_des_priv *priv, struct max_des_pipe *pipe,
-				const char *name);
+			       const char *name);
 	int (*log_phy_status)(struct max_des_priv *priv, struct max_des_phy *phy,
-				const char *name);
+			       const char *name);
 	int (*mipi_enable)(struct max_des_priv *priv, bool enable);
+	int (*set_pipe_enable)(struct max_des_priv *priv,
+			       struct max_des_pipe *pipe, bool enable);
 	int (*init)(struct max_des_priv *priv);
 	int (*init_phy)(struct max_des_priv *priv, struct max_des_phy *phy);
 	int (*init_pipe)(struct max_des_priv *priv, struct max_des_pipe *pipe);
@@ -144,13 +140,13 @@ struct max_des_priv {
 	struct regmap *regmap;
 
 	struct i2c_mux_core *mux;
-	int mux_chan;
 
 	unsigned int gmsl_link_mask;
 	unsigned int gmsl_links_used;
 
 	unsigned int num_subdevs;
 	struct mutex lock;
+	struct list_head registry_node;
 	bool active;
 
 	bool pipe_stream_autoselect;
@@ -161,8 +157,17 @@ struct max_des_priv {
 	struct max_des_subdev_priv *sd_privs;
 };
 
+int max_des_ch_enable(struct max_des_subdev_priv *sd_priv, bool enable);
+
+int max_des_update_pipe_remaps(struct max_des_priv *priv,
+				      struct max_des_pipe *pipe);
+
+int max_des_probe(struct max_des_priv *priv);
+
+int max_des_remove(struct max_des_priv *priv);
+
 static inline struct max_des_phy *max_des_phy_by_id(struct max_des_priv *priv,
-							unsigned int index)
+						    unsigned int index)
 {
 	return &priv->phys[index];
 }
