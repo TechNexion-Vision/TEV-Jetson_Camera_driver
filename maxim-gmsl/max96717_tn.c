@@ -1,33 +1,165 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
-* Maxim MAX96717 GMSL2 Serializer Driver
-*
-*/
+ * Maxim MAX96717 GMSL2 Serializer Driver
+ *
+ */
 
-#include <linux/i2c.h>
-#include <linux/i2c-mux.h>
-#include <linux/regmap.h>
 #include <linux/gpio/driver.h>
-#include <linux/module.h>
-#include <linux/of_graph.h>
 #include <linux/pinctrl/pinctrl.h>
 #include <linux/pinctrl/pinmux.h>
 #include <linux/pinctrl/pinconf.h>
 #include <linux/pinctrl/pinconf-generic.h>
 
-#include <media/v4l2-fwnode.h>
-#include <media/v4l2-subdev.h>
-
 #include "max_ser.h"
 #include "max_serdes.h"
 
-#define MAX96717_NAME				"max96717"
-#define MAX96717_PINCTRL_NAME		MAX96717_NAME "-pinctrl"
-#define MAX96717_GPIOCHIP_NAME		MAX96717_NAME "-gpiochip"
-#define MAX96717_GPIO_NUM			(11)
-#define MAX96717_PIPES_NUM			(4)
-#define MAX96717_PHYS_NUM			(2)
-#define MAX96717_LANE_CONFIGS_NUM	(4)
+#define MAX96717_REG0								0x0
+
+#define MAX96717_REG2								0x2
+#define MAX96717_REG2_VID_TX_EN_P(p)				BIT(4 + (p))
+
+#define MAX96717_REG3								0x3
+#define MAX96717_REG3_RCLKSEL						GENMASK(1, 0)
+#define MAX96717_REG3_RCLKSEL_REFERENCE_PLL			0b11
+
+#define MAX96717_REG6								0x6
+#define MAX96717_REG6_RCLKEN						BIT(5)
+
+#define MAX96717_I2C_2(x)							(0x42 + (x) * 0x2)
+#define MAX96717_I2C_2_SRC							GENMASK(7, 1)
+
+#define MAX96717_I2C_3(x)							(0x43 + (x) * 0x2)
+#define MAX96717_I2C_3_DST							GENMASK(7, 1)
+
+#define MAX96717_TX3(p)								(0x53 + (p) * 0x4)
+#define MAX96717_TX3_TX_STR_SEL						GENMASK(1, 0)
+
+#define MAX96717_VIDEO_TX0(p)						(0x100 + (p) * 0x8)
+#define MAX96717_VIDEO_TX0_AUTO_BPP					BIT(3)
+
+#define MAX96717_VIDEO_TX1(p)						(0x101 + (p) * 0x8)
+#define MAX96717_VIDEO_TX1_BPP						GENMASK(5, 0)
+
+#define MAX96717_VIDEO_TX2(p)						(0x102 + (p) * 0x8)
+#define MAX96717_VIDEO_TX2_PCLKDET					BIT(7)
+#define MAX96717_VIDEO_TX2_DRIFT_DET_EN				BIT(1)
+
+#define MAX96717_GPIO_A(x)							(0x2be + (x) * 0x3)
+#define MAX96717_GPIO_A_GPIO_OUT_DIS				BIT(0)
+#define MAX96717_GPIO_A_GPIO_TX_EN					BIT(1)
+#define MAX96717_GPIO_A_GPIO_RX_EN					BIT(2)
+#define MAX96717_GPIO_A_GPIO_IN						BIT(3)
+#define MAX96717_GPIO_A_GPIO_OUT					BIT(4)
+#define MAX96717_GPIO_A_TX_COMP_EN					BIT(5)
+#define MAX96717_GPIO_A_RES_CFG						BIT(7)
+
+#define MAX96717_GPIO_B(x)							(0x2bf + (x) * 0x3)
+#define MAX96717_GPIO_B_GPIO_TX_ID					GENMASK(4, 0)
+#define MAX96717_GPIO_B_OUT_TYPE					BIT(5)
+#define MAX96717_GPIO_B_PULL_UPDN_SEL				GENMASK(7, 6)
+#define MAX96717_GPIO_B_PULL_UPDN_SEL_NONE			0b00
+#define MAX96717_GPIO_B_PULL_UPDN_SEL_PU			0b01
+#define MAX96717_GPIO_B_PULL_UPDN_SEL_PD			0b10
+
+#define MAX96717_GPIO_C(x)							(0x2c0 + (x) * 0x3)
+#define MAX96717_GPIO_C_GPIO_RX_ID					GENMASK(4, 0)
+
+#define MAX96717_CMU2								0x302
+#define MAX96717_CMU2_PFDDIV_RSHORT					GENMASK(6, 4)
+#define MAX96717_CMU2_PFDDIV_RSHORT_1_1V			0b001
+
+#define MAX96717_FRONTTOP_0							0x308
+#define MAX96717_FRONTTOP_0_CLK_SEL_P(x)			BIT(x)
+#define MAX96717_FRONTTOP_0_START_PORT(x)			BIT((x) + 4)
+
+#define MAX96717_FRONTTOP_1(p)						(0x309 + (p) * 0x2)
+#define MAX96717_FRONTTOP_2(p)						(0x30a + (p) * 0x2)
+
+#define MAX96717_FRONTTOP_9							0x311
+#define MAX96717_FRONTTOP_9_START_PORT(p, x)		BIT((p) + (x) * 4)
+
+#define MAX96717_FRONTTOP_10						0x312
+#define MAX96717_FRONTTOP_10_BPP8DBL(p)				BIT(p)
+
+#define MAX96717_FRONTTOP_11						0x313
+#define MAX96717_FRONTTOP_11_BPP10DBL(p)			BIT(p)
+#define MAX96717_FRONTTOP_11_BPP12DBL(p)			BIT((p) + 4)
+
+#define MAX96717_FRONTTOP_12(p, x)					(0x314 + (p) * 0x2 + (x))
+#define MAX96717_MEM_DT_SEL							GENMASK(5, 0)
+#define MAX96717_MEM_DT_EN							BIT(6)
+
+#define MAX96717_FRONTTOP_20(p)						(0x31c + (p) * 0x1)
+#define MAX96717_FRONTTOP_20_SOFT_BPP_EN			BIT(5)
+#define MAX96717_FRONTTOP_20_SOFT_BPP				GENMASK(4, 0)
+
+#define MAX96717_MIPI_RX0							0x330
+#define MAX96717_MIPI_RX0_NONCONTCLK_EN				BIT(6)
+#define MAX96717_MIPI_RX0_MIPI_RX_RESET				BIT(3)
+
+#define MAX96717_MIPI_RX1							0x331
+#define MAX96717_MIPI_RX1_CTRL_NUM_LANES			GENMASK(5, 4)
+
+#define MAX96717_MIPI_RX2							0x332
+#define MAX96717_MIPI_RX2_PHY1_LANE_MAP				GENMASK(7, 4)
+
+#define MAX96717_MIPI_RX3							0x333
+#define MAX96717_MIPI_RX3_PHY2_LANE_MAP				GENMASK(3, 0)
+
+#define MAX96717_MIPI_RX4							0x334
+#define MAX96717_MIPI_RX4_PHY1_POL_MAP				GENMASK(5, 4)
+
+#define MAX96717_MIPI_RX5							0x335
+#define MAX96717_MIPI_RX5_PHY2_POL_MAP				GENMASK(1, 0)
+#define MAX96717_MIPI_RX5_PHY2_POL_MAP_CLK			BIT(2)
+
+#define MAX96717_EXT11								0x383
+#define MAX96717_EXT11_TUN_MODE						BIT(7)
+
+#define MAX96717_EXT21								0x38d
+#define MAX96717_EXT22								0x38e
+#define MAX96717_EXT23								0x38f
+#define MAX96717_EXT24								0x390
+
+#define MAX96717_EXTA(x)							(0x3dc + (x))
+
+#define MAX96717_REF_VTG0							0x3f0
+#define MAX96717_REF_VTG0_REFGEN_EN					BIT(0)
+#define MAX96717_REF_VTG0_REFGEN_RST				BIT(1)
+#define MAX96717_REF_VTG0_REFGEN_PREDEF_FREQ_ALT	BIT(3)
+#define MAX96717_REF_VTG0_REFGEN_PREDEF_FREQ		GENMASK(5, 4)
+#define MAX96717_REF_VTG0_REFGEN_PREDEF_EN			BIT(6)
+
+#define MAX96717_REF_VTG1							0x3f1
+#define MAX96717_REF_VTG1_PCLKEN					BIT(0)
+#define MAX96717_REF_VTG1_PCLK_GPIO					GENMASK(5, 1)
+#define MAX96717_REF_VTG1_RCLKEN_Y					BIT(7)
+
+#define MAX96717_PIO_SLEW_0							0x56f
+#define MAX96717_PIO_SLEW_0_PIO00_SLEW				GENMASK(1, 0)
+#define MAX96717_PIO_SLEW_0_PIO01_SLEW				GENMASK(3, 2)
+#define MAX96717_PIO_SLEW_0_PIO02_SLEW				GENMASK(5, 4)
+
+#define MAX96717_PIO_SLEW_1							0x570
+#define MAX96717_PIO_SLEW_1_PIO05_SLEW				GENMASK(3, 2)
+#define MAX96717_PIO_SLEW_1_PIO06_SLEW				GENMASK(5, 4)
+
+#define MAX96717_PIO_SLEW_2							0x571
+#define MAX96717_PIO_SLEW_2_PIO010_SLEW				GENMASK(5, 4)
+#define MAX96717_PIO_SLEW_2_PIO011_SLEW				GENMASK(7, 6)
+
+#define MAX96717_RLMSCE								0x14ce
+#define MAX96717_RLMSCE_ENFFE						BIT(0)
+#define MAX96717_RLMSCE_ENMINUS_MAN					BIT(3)
+#define MAX96717_RLMSCE_ENMINUS_REG					BIT(4)
+
+#define MAX96717_NAME					"max96717"
+#define MAX96717_PINCTRL_NAME			MAX96717_NAME "-pinctrl"
+#define MAX96717_GPIOCHIP_NAME			MAX96717_NAME "-gpiochip"
+#define MAX96717_GPIO_NUM				11
+#define MAX96717_PIPES_NUM				4
+#define MAX96717_PHYS_NUM				2
+#define MAX96717_LANE_CONFIGS_NUM		4
 
 struct max96717_priv {
 	struct max_ser_priv ser_priv;
@@ -56,11 +188,8 @@ struct max96717_chip_info {
 	unsigned int phy_configs[MAX96717_LANE_CONFIGS_NUM];
 };
 
-#define ser_to_priv(ser) \
-	container_of(ser, struct max96717_priv, ser_priv)
-
 static struct max_ser_subdev_priv *next_subdev(struct max_ser_priv *priv,
-										struct max_ser_subdev_priv *sd_priv)
+						struct max_ser_subdev_priv *sd_priv)
 {
 	if (!sd_priv)
 		sd_priv = &priv->sd_privs[0];
@@ -78,600 +207,8 @@ static struct max_ser_subdev_priv *next_subdev(struct max_ser_priv *priv,
 #define for_each_subdev(priv, sd_priv) \
 	for ((sd_priv) = NULL; ((sd_priv) = next_subdev((priv), (sd_priv))); )
 
-static inline struct max_ser_subdev_priv *sd_to_max_ser(struct v4l2_subdev *sd)
-{
-	return container_of(sd, struct max_ser_subdev_priv, sd);
-}
-
-static int max_ser_update_pipe_active(struct max_ser_priv *priv,
-					struct max_ser_pipe *pipe)
-{
-	struct max_ser_subdev_priv *sd_priv;
-	bool enable = 0;
-
-	dev_dbg(priv->dev, "%s()\n", __func__);
-
-	for_each_subdev(priv, sd_priv) {
-		if (sd_priv->pipe_id == pipe->index && sd_priv->active) {
-			enable = 1;
-			break;
-		}
-	}
-
-	if (enable == pipe->active)
-		return 0;
-
-	pipe->active = enable;
-
-	return priv->ops->set_pipe_enable(priv, pipe, enable);
-}
-
-static int max_ser_ch_enable(struct max_ser_subdev_priv *sd_priv, bool enable)
-{
-	struct max_ser_priv *priv = sd_priv->priv;
-	struct max_ser_pipe *pipe = max_ser_ch_pipe(sd_priv);
-	int ret = 0;
-
-	dev_dbg(priv->dev, "%s()\n", __func__);
-
-	mutex_lock(&priv->lock);
-
-	if (sd_priv->active == enable)
-		goto exit;
-
-	sd_priv->active = enable;
-
-	ret = max_ser_update_pipe_active(priv, pipe);
-
-exit:
-	mutex_unlock(&priv->lock);
-
-	return ret;
-}
-
-static int max_ser_i2c_mux_select(struct i2c_mux_core *muxc, u32 chan)
-{
-	return 0;
-}
-
-static int max_ser_i2c_mux_init(struct max_ser_priv *priv)
-{
-	struct device_node *i2c_mux;
-	unsigned int i;
-	int ret;
-
-	dev_dbg(priv->dev, "%s()\n", __func__);
-
-	i2c_mux = of_find_node_by_name(priv->dev->of_node, "i2c-mux");
-	if (!i2c_mux) {
-		dev_dbg(priv->dev, "find not property of i2c-mux\n");
-		return 0;
-	}
-
-	if (!i2c_check_functionality(priv->client->adapter, I2C_FUNC_SMBUS_WRITE_BYTE_DATA))
-		return -ENODEV;
-
-	priv->mux = i2c_mux_alloc(priv->client->adapter, &priv->client->dev,
-				priv->ops->num_pipes, 0, I2C_MUX_LOCKED,
-				max_ser_i2c_mux_select, NULL);
-	if (!priv->mux)
-		return -ENOMEM;
-
-	priv->mux->priv = priv;
-
-	for (i = 0; i < priv->ops->num_pipes; i++) {
-		struct max_ser_pipe *pipe = &priv->pipes[i];
-
-		if (!pipe->enabled)
-			continue;
-
-		ret = i2c_mux_add_adapter(priv->mux, 0, pipe->index, 0);
-		if (ret)
-			goto err_add_adapters;
-	}
-
-	return 0;
-
-err_add_adapters:
-	i2c_mux_del_adapters(priv->mux);
-	return ret;
-}
-
-static int max_ser_update_pipe_dts(struct max_ser_priv *priv,
-				struct max_ser_pipe *pipe)
-{
-	struct max_ser_subdev_priv *sd_priv;
-
-	dev_dbg(priv->dev, "%s()\n", __func__);
-
-	pipe->num_dts = 0;
-
-	if (priv->tunnel_mode)
-		return 0;
-
-	for_each_subdev(priv, sd_priv) {
-		if (sd_priv->pipe_id != pipe->index)
-			continue;
-
-		if (pipe->num_dts == priv->ops->num_dts_per_pipe) {
-			dev_err(priv->dev, "Too many data types per pipe\n");
-			return -EINVAL;
-		}
-
-		if (!sd_priv->fmt)
-			continue;
-
-		/* TODO: optimize by checking for existing filters. */
-		pipe->dts[pipe->num_dts++] = sd_priv->fmt->dt;
-	}
-
-	return priv->ops->update_pipe_dts(priv, pipe);
-}
-
-static int max_ser_update_pipe_vcs(struct max_ser_priv *priv,
-				struct max_ser_pipe *pipe)
-{
-	struct max_ser_subdev_priv *sd_priv;
-
-	dev_dbg(priv->dev, "%s()\n", __func__);
-
-	pipe->vcs = 0;
-
-	if (priv->tunnel_mode)
-		return 0;
-
-	for_each_subdev(priv, sd_priv) {
-		if (sd_priv->pipe_id != pipe->index)
-			continue;
-
-		pipe->vcs |= BIT(sd_priv->vc_id);
-	}
-
-	return priv->ops->update_pipe_vcs(priv, pipe);
-}
-
-static int max_ser_init(struct max_ser_priv *priv)
-{
-	unsigned int i;
-	int ret;
-
-	dev_dbg(priv->dev, "%s()\n", __func__);
-
-	ret = priv->ops->init(priv);
-	if (ret)
-		return ret;
-
-	for (i = 0; i < priv->ops->num_phys; i++) {
-		struct max_ser_phy *phy = &priv->phys[i];
-
-		if (!phy->enabled)
-			continue;
-
-		if (!phy->bus_config_parsed) {
-			dev_err(priv->dev, "Cannot turn on unconfigured PHY\n");
-			return -EINVAL;
-		}
-
-		ret = priv->ops->init_phy(priv, phy);
-		if (ret)
-			return ret;
-	}
-
-	for (i = 0; i < priv->ops->num_pipes; i++) {
-		struct max_ser_pipe *pipe = &priv->pipes[i];
-
-		if (!pipe->enabled)
-			continue;
-
-		ret = priv->ops->init_pipe(priv, pipe);
-		if (ret)
-			return ret;
-
-		ret = max_ser_update_pipe_vcs(priv, pipe);
-		if (ret)
-			return ret;
-
-		ret = max_ser_update_pipe_dts(priv, pipe);
-		if (ret)
-			return ret;
-	}
-
-	ret = priv->ops->post_init(priv);
-	if (ret)
-		return ret;
-
-	return 0;
-}
-
-static int max_ser_parse_xlate(struct max_ser_priv *priv)
-{
-	struct property *local;
-	struct property *remote;
-	int ret;
-	u32 local_addr;
-	u32 remote_addr;
-	struct max_i2c_xlate *xlate;
-
-	dev_dbg(priv->dev, "%s()\n", __func__);
-
-	local = of_find_property(priv->dev->of_node,
-				"i2c-addr-alias-map-local",
-				&ret);
-	remote = of_find_property(priv->dev->of_node,
-				"i2c-addr-alias-map-remote",
-				&ret);
-	if (local == NULL || remote == NULL) {
-		dev_dbg(priv->dev, "find not property of alias map\n");
-		return 0;
-	}
-
-	ret = 0;
-	while(ret == 0 && priv->num_i2c_xlates < priv->ops->num_i2c_xlates) {
-		ret = of_property_read_u32_index(priv->dev->of_node,
-						"i2c-addr-alias-map-local",
-						priv->num_i2c_xlates,
-						&local_addr);
-		if (ret != 0 || local_addr > 0x7f)
-			break;
-
-		ret = of_property_read_u32_index(priv->dev->of_node,
-						"i2c-addr-alias-map-remote",
-						priv->num_i2c_xlates,
-						&remote_addr);
-		if (ret != 0 || remote_addr > 0x7f)
-			break;
-
-		xlate = &priv->i2c_xlates[priv->num_i2c_xlates++];
-		xlate->src = (u8)(local_addr & 0x7f);
-		xlate->dst = (u8)(remote_addr & 0x7f);
-
-		dev_info(priv->dev, "i2c address alias "
-			"index: %d local: 0x%x remote: 0x%x\n",
-			priv->num_i2c_xlates, xlate->dst, xlate->src);
-
-		ret = priv->ops->init_i2c_xlate(priv);
-
-		if (ret != 0)
-			break;
-	}
-
-	return 0;
-}
-
-static int max_ser_parse_i2c_dt(struct max_ser_priv *priv)
-{
-	struct device *dev = &priv->client->dev;
-	struct device_node *i2c_mux;
-	struct device_node *node = NULL;
-
-	dev_dbg(priv->dev, "%s()\n", __func__);
-
-	i2c_mux = of_find_node_by_name(dev->of_node, "i2c-mux");
-	if (!i2c_mux) {
-		dev_dbg(priv->dev, "find not property of i2c-mux\n");
-		return 0;
-	}
-
-	/* Identify which i2c-mux channels are enabled */
-	for_each_child_of_node(i2c_mux, node) {
-		u32 id = 0;
-
-		of_property_read_u32(node, "reg", &id);
-		if (id >= priv->ops->num_pipes)
-			continue;
-
-		if (!of_device_is_available(node)) {
-			dev_dbg(priv->dev, "Skipping disabled I2C bus port %u\n", id);
-			continue;
-		}
-	}
-	of_node_put(node);
-	of_node_put(i2c_mux);
-	of_node_put(dev->of_node);
-
-	return 0;
-}
-
-static int max_ser_parse_ch_dt(struct max_ser_subdev_priv *sd_priv,
-				struct device_node *node)
-{
-	struct max_ser_priv *priv = sd_priv->priv;
-	struct max_ser_pipe *pipe;
-	struct max_ser_phy *phy;
-	u32 val;
-	struct v4l2_fwnode_endpoint v4l2_ep = {
-		.bus_type = V4L2_MBUS_CSI2_DPHY
-	};
-	struct v4l2_fwnode_bus_mipi_csi2 *mipi = &v4l2_ep.bus.mipi_csi2;
-	int ret;
-
-	dev_dbg(priv->dev, "%s()\n", __func__);
-
-	of_property_read_string(node, "label", &sd_priv->label);
-
-	val = sd_priv->pipe_id;
-	of_property_read_u32(node, "maxim,pipe-id", &val);
-	if (val >= priv->ops->num_pipes) {
-		dev_err(priv->dev, "Invalid pipe %u\n", val);
-		return -EINVAL;
-	}
-	sd_priv->pipe_id = val;
-
-	val = 0;
-	of_property_read_u32(node, "maxim,vc-id", &val);
-	if (val >= MAX_SERDES_VC_ID_NUM) {
-		dev_err(priv->dev, "Invalid virtual channel %u\n", val);
-		return -EINVAL;
-	}
-	sd_priv->vc_id = val;
-
-	if (of_property_read_bool(node, "maxim,embedded-data"))
-		sd_priv->fmt = max_format_by_dt(MAX_DT_EMB8);
-
-	pipe = &priv->pipes[val];
-	pipe->enabled = true;
-
-	phy = &priv->phys[pipe->phy_id];
-	phy->enabled = true;
-
-	if (v4l2_fwnode_endpoint_parse(of_fwnode_handle(node), &v4l2_ep)) {
-		dev_err(priv->dev, "Could not parse v4l2 endpoint\n");
-		return ret;
-	}
-
-	if (mipi->flags & V4L2_MBUS_CSI2_NONCONTINUOUS_CLOCK &&
-		!priv->ops->supports_noncontinuous_clock) {
-		dev_err(priv->dev, "Clock non-continuous mode is not supported\n");
-		return -EINVAL;
-	}
-
-	dev_info(priv->dev, "num_data_lanes [%d], clock lane [%d]\n",
-		mipi->num_data_lanes, mipi->clock_lane);
-
-	if (!phy->bus_config_parsed) {
-		phy->mipi = v4l2_ep.bus.mipi_csi2;
-		phy->bus_config_parsed = true;
-
-		return 0;
-	}
-
-	v4l2_fwnode_endpoint_free(&v4l2_ep);
-
-	if (phy->mipi.num_data_lanes != mipi->num_data_lanes) {
-		dev_err(priv->dev, "PHY configured with differing number of data lanes\n");
-		return -EINVAL;
-	}
-
-	if ((phy->mipi.flags & V4L2_MBUS_CSI2_NONCONTINUOUS_CLOCK) !=
-		(mipi->flags & V4L2_MBUS_CSI2_NONCONTINUOUS_CLOCK)) {
-		dev_err(priv->dev, "PHY configured with differing clock continuity\n");
-		return -EINVAL;
-	}
-
-	return 0;
-}
-
-static int max_ser_parse_pipe_dt(struct max_ser_priv *priv,
-				struct max_ser_pipe *pipe,
-				struct device_node *node)
-{
-	unsigned int val;
-
-	dev_dbg(priv->dev, "%s()\n", __func__);
-
-	val = pipe->phy_id;
-	of_property_read_u32(node, "maxim,phy-id", &val);
-	if (val >= priv->ops->num_phys) {
-		dev_err(priv->dev, "Invalid PHY %u\n", val);
-		return -EINVAL;
-	}
-	pipe->phy_id = val;
-
-	val = pipe->stream_id;
-	of_property_read_u32(node, "maxim,stream-id", &val);
-	if (val >= MAX_SERDES_STREAMS_NUM) {
-		dev_err(priv->dev, "Invalid stream %u\n", val);
-		return -EINVAL;
-	}
-	pipe->stream_id = val;
-
-	val = 0;
-	of_property_read_u32(node, "maxim,soft-bpp", &val);
-	if (val > 24) {
-		dev_err(priv->dev, "Invalid soft bpp %u\n", val);
-		return -EINVAL;
-	}
-	pipe->soft_bpp = val;
-
-	val = 0;
-	of_property_read_u32(node, "maxim,bpp", &val);
-	if (val > 24) {
-		dev_err(priv->dev, "Invalid bpp %u\n", val);
-		return -EINVAL;
-	}
-	pipe->bpp = val;
-
-	pipe->dbl8 = of_property_read_bool(node, "maxim,dbl8");
-	pipe->dbl10 = of_property_read_bool(node, "maxim,dbl10");
-	pipe->dbl12 = of_property_read_bool(node, "maxim,dbl12");
-
-	pipe->code_name = "UYVY8_1X16";
-	of_property_read_string(node, "dt", &pipe->code_name);
-	dev_dbg(priv->dev, "format = %s\n", pipe->code_name);
-
-	return 0;
-}
-
-static int max_ser_parse_dt(struct max_ser_priv *priv)
-{
-	const char *channel_node_name = "channel";
-	const char *pipe_node_name = "pipe";
-	struct device_node *node;
-	struct max_ser_subdev_priv *sd_priv;
-	struct max_ser_pipe *pipe;
-	struct max_ser_phy *phy;
-	unsigned int i;
-	u32 index;
-	u32 val;
-	int ret;
-
-	dev_dbg(priv->dev, "%s()\n", __func__);
-
-	val = of_property_read_bool(priv->dev->of_node, "maxim,tunnel-mode");
-	if (val && !priv->ops->supports_tunnel_mode) {
-		dev_err(priv->dev, "Tunnel mode is not supported\n");
-		return -EINVAL;
-	}
-	priv->tunnel_mode = val;
-
-	for (i = 0; i < priv->ops->num_phys; i++) {
-		phy = &priv->phys[i];
-		phy->index = i;
-	}
-
-	for (i = 0; i < priv->ops->num_pipes; i++) {
-		pipe = &priv->pipes[i];
-		pipe->index = i;
-		pipe->phy_id = i % priv->ops->num_phys;
-		pipe->stream_id = i % MAX_SERDES_STREAMS_NUM;
-	}
-
-	for_each_child_of_node(priv->dev->of_node, node) {
-		if (of_node_name_eq(node, pipe_node_name)) {
-			ret = of_property_read_u32(node, "reg", &index);
-			if (ret) {
-				dev_err(priv->dev, "Failed to read reg: %d\n", ret);
-				continue;
-			}
-
-			if (index >= priv->ops->num_pipes) {
-				dev_err(priv->dev, "Invalid pipe number %u\n", index);
-				of_node_put(node);
-				return -EINVAL;
-			}
-
-			pipe = &priv->pipes[index];
-
-			ret = max_ser_parse_pipe_dt(priv, pipe, node);
-			if (ret) {
-				of_node_put(node);
-				return ret;
-			}
-		}
-
-		if (of_node_name_eq(node, channel_node_name)) {
-			ret = of_property_read_u32(node, "reg", &index);
-			if (ret) {
-				dev_err(priv->dev, "Failed to read reg: %d\n", ret);
-				continue;
-			}
-
-			priv->num_subdevs++;
-		}
-	}
-	of_node_put(node);
-
-	priv->sd_privs = devm_kcalloc(priv->dev, priv->num_subdevs,
-					sizeof(*priv->sd_privs), GFP_KERNEL);
-	if (!priv->sd_privs)
-		return -ENOMEM;
-
-	i = 0;
-	for_each_child_of_node(priv->dev->of_node, node) {
-		if (of_node_name_eq(node, channel_node_name)) {
-			ret = of_property_read_u32(node, "reg", &index);
-			if (ret) {
-				dev_err(priv->dev, "Failed to read reg: %d\n", ret);
-				continue;
-			}
-
-			sd_priv = &priv->sd_privs[i++];
-			sd_priv->node = node;
-			sd_priv->priv = priv;
-			sd_priv->index = index;
-			sd_priv->pipe_id = index % priv->ops->num_pipes;
-
-			ret = max_ser_parse_ch_dt(sd_priv, node);
-			if (ret) {
-				of_node_put(node);
-				return ret;
-			}
-		}
-	}
-
-	return 0;
-}
-
-static int max_ser_allocate(struct max_ser_priv *priv)
-{
-	unsigned int i;
-
-	priv->phys = devm_kcalloc(priv->dev, priv->ops->num_phys,
-				sizeof(*priv->phys), GFP_KERNEL);
-	if (!priv->phys)
-		return -ENOMEM;
-
-	priv->pipes = devm_kcalloc(priv->dev, priv->ops->num_pipes,
-				sizeof(*priv->pipes), GFP_KERNEL);
-	if (!priv->pipes)
-		return -ENOMEM;
-
-	priv->i2c_xlates = devm_kcalloc(priv->dev, priv->ops->num_i2c_xlates,
-					sizeof(*priv->i2c_xlates), GFP_KERNEL);
-	if (!priv->i2c_xlates)
-		return -ENOMEM;
-
-	for (i = 0; i < priv->ops->num_pipes; i++) {
-		struct max_ser_pipe *pipe = &priv->pipes[i];
-
-		pipe->dts = devm_kcalloc(priv->dev, priv->ops->num_dts_per_pipe,
-					sizeof(*pipe->dts), GFP_KERNEL);
-	}
-
-	return 0;
-}
-
-static int max_ser_probe(struct max_ser_priv *priv)
-{
-	int ret;
-
-	dev_dbg(priv->dev, "%s()\n", __func__);
-
-	mutex_init(&priv->lock);
-
-	ret = max_ser_allocate(priv);
-	if (ret)
-		return ret;
-
-	ret = max_ser_parse_dt(priv);
-	if (ret)
-		return ret;
-
-	ret = max_ser_parse_i2c_dt(priv);
-	if (ret)
-		return ret;
-
-	ret = max_ser_parse_xlate(priv);
-	if (ret)
-		return ret;
-
-	ret = max_ser_init(priv);
-	if (ret)
-		return ret;
-
-	ret = max_ser_i2c_mux_init(priv);
-	if (ret)
-		return ret;
-
-	dev_info(priv->dev, "probe successful\n");
-	return 0;
-}
-
-static int max_ser_remove(struct max_ser_priv *priv)
-{
-	i2c_mux_del_adapters(priv->mux);
-	return 0;
-}
+#define ser_to_priv(ser) \
+	container_of(ser, struct max96717_priv, ser_priv)
 
 static int max96717_read(struct max96717_priv *priv, int reg)
 {
@@ -736,16 +273,6 @@ static int max96717_update_bits(struct max96717_priv *priv, unsigned int reg,
 	return ret;
 }
 
-static unsigned int max96717_field_get(unsigned int val, unsigned int mask)
-{
-	return (val & mask) >> __ffs(mask);
-}
-
-static unsigned int max96717_field_prep(unsigned int val, unsigned int mask)
-{
-	return (val << __ffs(mask)) & mask;
-}
-
 #define MAX96717_PIN(n) \
 	PINCTRL_PIN(n, "mfp" __stringify(n))
 
@@ -799,7 +326,7 @@ static const struct pingroup max96717_ctrl_groups[] = {
 	static const char * const name ## _groups[] = { __VA_ARGS__ }
 
 MAX96717_FUNC_GROUPS(gpio, "mfp0", "mfp1", "mfp2", "mfp3", "mfp4", "mfp5",
-			"mfp6", "mfp7", "mfp8", "mfp9", "mfp10");
+			   "mfp6", "mfp7", "mfp8", "mfp9", "mfp10");
 MAX96717_FUNC_GROUPS(pclk, "mfp0", "mfp1", "mfp2", "mfp3", "mfp4", "mfp7", "mfp8");
 MAX96717_FUNC_GROUPS(rclkout, "mfp4", "mfp2");
 
@@ -812,7 +339,7 @@ enum max96717_func {
 #define MAX96717_FUNC(name)						\
 	[max96717_func_ ## name] =					\
 		PINCTRL_PINFUNCTION(__stringify(name), name ## _groups,	\
-					ARRAY_SIZE(name ## _groups))
+				    ARRAY_SIZE(name ## _groups))
 
 static const struct pinfunction max96717_functions[] = {
 	MAX96717_FUNC(gpio),
@@ -862,97 +389,112 @@ static int max96717_ctrl_get_group_pins(struct pinctrl_dev *pctldev, unsigned se
 }
 
 static int max96717_get_pin_config_reg(unsigned int offset, u32 param,
-					unsigned int *reg, unsigned int *mask,
-					unsigned int *val)
+				       unsigned int *reg, unsigned int *mask,
+				       unsigned int *val)
 {
-	*reg = 0x2be + offset * 0x3;
+	*reg = MAX96717_GPIO_A(offset);
 
 	switch (param) {
 	case PIN_CONFIG_OUTPUT_ENABLE:
-		*mask = BIT(0);
+		*mask = MAX96717_GPIO_A_GPIO_OUT_DIS;
 		*val = 0b0;
 		return 0;
 	case PIN_CONFIG_INPUT_ENABLE:
-		*mask = BIT(0);
+		*mask = MAX96717_GPIO_A_GPIO_OUT_DIS;
 		*val = 0b1;
 		return 0;
 	case MAX96717_PINCTRL_GMSL_TX_EN:
-		*mask = BIT(1);
+		*mask = MAX96717_GPIO_A_GPIO_TX_EN;
 		*val = 0b1;
 		return 0;
 	case MAX96717_PINCTRL_GMSL_RX_EN:
-		*mask = BIT(2);
+		*mask = MAX96717_GPIO_A_GPIO_RX_EN;
 		*val = 0b1;
 		return 0;
 	case MAX96717_PINCTRL_INPUT_VALUE:
-		*mask = BIT(3);
+		*mask = MAX96717_GPIO_A_GPIO_IN;
 		*val = 0b1;
 		return 0;
 	case PIN_CONFIG_OUTPUT:
-		*mask = BIT(4);
+		*mask = MAX96717_GPIO_A_GPIO_OUT;
 		*val = 0b1;
 		return 0;
 	case MAX96717_PINCTRL_JITTER_COMPENSATION_EN:
-		*mask = BIT(5);
+		*mask = MAX96717_GPIO_A_TX_COMP_EN;
 		*val = 0b1;
 		return 0;
 	case MAX96717_PINCTRL_PULL_STRENGTH_WEAK:
-		*mask = BIT(7);
+		*mask = MAX96717_GPIO_A_RES_CFG;
 		*val = 0b0;
 		return 0;
+	}
+
+	*reg = MAX96717_GPIO_B(offset);
+
+	switch (param) {
 	case MAX96717_PINCTRL_GMSL_TX_ID:
-		*reg += 1;
-		*mask = GENMASK(4, 0);
+		*mask = MAX96717_GPIO_B_GPIO_TX_ID;
 		return 0;
 	case PIN_CONFIG_DRIVE_OPEN_DRAIN:
-		*reg += 1;
-		*mask = BIT(5);
+		*mask = MAX96717_GPIO_B_OUT_TYPE;
 		*val = 0b0;
 		return 0;
 	case PIN_CONFIG_DRIVE_PUSH_PULL:
-		*reg += 1;
-		*mask = BIT(5);
+		*mask = MAX96717_GPIO_B_OUT_TYPE;
 		*val = 0b1;
 		return 0;
 	case PIN_CONFIG_BIAS_DISABLE:
-		*reg += 1;
-		*mask = GENMASK(7, 6);
-		*val = 0b00;
+		*mask = MAX96717_GPIO_B_PULL_UPDN_SEL;
+		*val = MAX96717_GPIO_B_PULL_UPDN_SEL_NONE;
 		return 0;
 	case PIN_CONFIG_BIAS_PULL_DOWN:
-		*reg += 1;
-		*mask = GENMASK(7, 6);
-		*val = 0b10;
+		*mask = MAX96717_GPIO_B_PULL_UPDN_SEL;
+		*val = MAX96717_GPIO_B_PULL_UPDN_SEL_PD;
 		return 0;
 	case PIN_CONFIG_BIAS_PULL_UP:
-		*reg += 1;
-		*mask = GENMASK(7, 6);
-		*val = 0b01;
+		*mask = MAX96717_GPIO_B_PULL_UPDN_SEL;
+		*val = MAX96717_GPIO_B_PULL_UPDN_SEL_PU;
 		return 0;
-	case PIN_CONFIG_SLEW_RATE:
-		*reg = 0x56f;
+	}
 
-		if (offset <= 2) {
-			*mask = GENMASK(1, 0) << (offset - 0) * 2;
-		} else if (offset <= 4) {
-			*reg += 1;
-			*mask = GENMASK(3, 2) << (offset - 3) * 2;
-		} else if (offset <= 6) {
+	switch (param) {
+	case PIN_CONFIG_SLEW_RATE:
+		if (offset < 3) {
+			*reg = MAX96717_PIO_SLEW_0;
+			if (offset == 0)
+				*mask = MAX96717_PIO_SLEW_0_PIO00_SLEW;
+			else if (offset == 1)
+				*mask = MAX96717_PIO_SLEW_0_PIO01_SLEW;
+			else
+				*mask = MAX96717_PIO_SLEW_0_PIO02_SLEW;
+		} else if (offset < 5) {
+			*reg = MAX96717_PIO_SLEW_1;
+			if (offset == 3)
+				*mask = MAX96717_PIO_SLEW_1_PIO05_SLEW;
+			else
+				*mask = MAX96717_PIO_SLEW_1_PIO06_SLEW;
+		} else if (offset < 7) {
 			return -EINVAL;
-		} else if (offset <= 8) {
-			*reg += 2;
-			*mask = GENMASK(5, 4) << (offset - 7) * 2;
+		} else if (offset < 9) {
+			*reg  = MAX96717_PIO_SLEW_2;
+			if (offset == 7)
+				*mask = MAX96717_PIO_SLEW_2_PIO010_SLEW;
+			else
+				*mask = MAX96717_PIO_SLEW_2_PIO011_SLEW;
 		} else {
 			return -EINVAL;
 		}
 		return 0;
 	case MAX96717_PINCTRL_GMSL_RX_ID:
-		*reg += 2;
-		*mask = GENMASK(4, 0);
+		*reg = MAX96717_GPIO_C(offset);
+		*mask = MAX96717_GPIO_C_GPIO_RX_ID;
 		return 0;
 	case MAX96717_PINCTRL_RCLKOUT_CLK:
-		*reg = 0x3;
-		*mask = GENMASK(1, 0);
+		if (offset != 2 && offset != 4)
+			return -EINVAL;
+
+		*reg = MAX96717_REG3;
+		*mask = MAX96717_REG3_RCLKSEL;
 		return 0;
 	default:
 		return -ENOTSUPP;
@@ -968,8 +510,6 @@ static int max96717_conf_pin_config_get(struct pinctrl_dev *pctldev,
 	unsigned int reg, mask, val;
 	int ret;
 
-	dev_dbg(priv->dev, "%s()\n", __func__);
-
 	ret = max96717_get_pin_config_reg(offset, param, &reg, &mask, &val);
 	if (ret)
 		return ret;
@@ -984,7 +524,7 @@ static int max96717_conf_pin_config_get(struct pinctrl_dev *pctldev,
 		if (ret < 0)
 			return ret;
 
-		val = max96717_field_get(ret, mask) == val;
+		val = field_get(mask, ret) == val;
 		if (!val)
 			return -EINVAL;
 
@@ -1001,7 +541,7 @@ static int max96717_conf_pin_config_get(struct pinctrl_dev *pctldev,
 		if (ret < 0)
 			return ret;
 
-		val = max96717_field_get(ret, mask) == val;
+		val = field_get(mask, ret) == val;
 		break;
 	case MAX96717_PINCTRL_GMSL_TX_ID:
 	case MAX96717_PINCTRL_GMSL_RX_ID:
@@ -1011,7 +551,7 @@ static int max96717_conf_pin_config_get(struct pinctrl_dev *pctldev,
 		if (ret < 0)
 			return ret;
 
-		val = max96717_field_get(val, mask);
+		val = field_get(mask, val);
 		break;
 	default:
 		return -ENOTSUPP;
@@ -1023,15 +563,13 @@ static int max96717_conf_pin_config_get(struct pinctrl_dev *pctldev,
 }
 
 static int max96717_conf_pin_config_set_one(struct max96717_priv *priv,
-						unsigned int offset,
-						unsigned long config)
+					    unsigned int offset,
+					    unsigned long config)
 {
 	u32 param = pinconf_to_config_param(config);
 	u32 arg = pinconf_to_config_argument(config);
 	unsigned int reg, mask, val;
 	int ret;
-
-	dev_dbg(priv->dev, "%s()\n", __func__);
 
 	ret = max96717_get_pin_config_reg(offset, param, &reg, &mask, &val);
 	if (ret)
@@ -1043,7 +581,7 @@ static int max96717_conf_pin_config_set_one(struct max96717_priv *priv,
 	case PIN_CONFIG_BIAS_DISABLE:
 	case PIN_CONFIG_BIAS_PULL_DOWN:
 	case PIN_CONFIG_BIAS_PULL_UP:
-		val = max96717_field_prep(val, mask);
+		val = field_prep(mask, val);
 
 		ret = max96717_update_bits(priv, reg, mask, val);
 		break;
@@ -1054,7 +592,7 @@ static int max96717_conf_pin_config_set_one(struct max96717_priv *priv,
 	case PIN_CONFIG_OUTPUT_ENABLE:
 	case PIN_CONFIG_INPUT_ENABLE:
 	case PIN_CONFIG_OUTPUT:
-		val = max96717_field_prep(arg ? val : ~val, mask);
+		val = field_prep(mask, arg ? val : ~val);
 
 		ret = max96717_update_bits(priv, reg, mask, val);
 		break;
@@ -1062,7 +600,7 @@ static int max96717_conf_pin_config_set_one(struct max96717_priv *priv,
 	case MAX96717_PINCTRL_GMSL_RX_ID:
 	case PIN_CONFIG_SLEW_RATE:
 	case MAX96717_PINCTRL_RCLKOUT_CLK:
-		val = max96717_field_prep(arg, mask);
+		val = field_prep(mask, arg);
 
 		ret = max96717_update_bits(priv, reg, mask, val);
 		break;
@@ -1096,8 +634,6 @@ static int max96717_conf_pin_config_set(struct pinctrl_dev *pctldev,
 	struct max96717_priv *priv = pinctrl_dev_get_drvdata(pctldev);
 	int ret;
 
-	dev_dbg(priv->dev, "%s()\n", __func__);
-
 	while (num_configs--) {
 		unsigned long config = *configs;
 
@@ -1117,15 +653,15 @@ static int max96717_mux_get_functions_count(struct pinctrl_dev *pctldev)
 }
 
 static const char *max96717_mux_get_function_name(struct pinctrl_dev *pctldev,
-						unsigned selector)
+						  unsigned selector)
 {
 	return max96717_functions[selector].name;
 }
 
 static int max96717_mux_get_groups(struct pinctrl_dev *pctldev,
-				unsigned selector,
-				const char * const **groups,
-				unsigned * const num_groups)
+				   unsigned selector,
+				   const char * const **groups,
+				   unsigned * const num_groups)
 {
 	*groups = max96717_functions[selector].groups;
 	*num_groups = max96717_functions[selector].ngroups;
@@ -1137,12 +673,15 @@ static int max96717_mux_set_pclk(struct max96717_priv *priv, unsigned int group)
 {
 	int ret;
 
-	ret = max96717_update_bits(priv, 0x3f1, BIT(0), BIT(0));
+	ret = max96717_update_bits(priv, MAX96717_REF_VTG1,
+				   MAX96717_REF_VTG1_PCLKEN,
+				   MAX96717_REF_VTG1_PCLKEN);
 	if (ret)
 		return ret;
 
-	ret = max96717_update_bits(priv, 0x3f1, GENMASK(5, 1),
-				FIELD_PREP(GENMASK(5, 1), group));
+	ret = max96717_update_bits(priv, MAX96717_REF_VTG1,
+				   MAX96717_REF_VTG1_PCLK_GPIO,
+				   field_prep(MAX96717_REF_VTG1_PCLK_GPIO, group));
 	if (ret)
 		return ret;
 
@@ -1154,12 +693,16 @@ static int max96717_mux_set_rclkout(struct max96717_priv *priv, unsigned int gro
 	int ret;
 
 	/* Enable RCLK. */
-	ret = max96717_update_bits(priv, 0x6, BIT(5), BIT(5));
+	ret = max96717_update_bits(priv, MAX96717_REG6,
+				   MAX96717_REG6_RCLKEN,
+				   MAX96717_REG6_RCLKEN);
 	if (ret)
 		return ret;
 
 	/* Enable RCLK output on PCLK. */
-	ret = max96717_update_bits(priv, 0x3f1, BIT(7), BIT(7));
+	ret = max96717_update_bits(priv, MAX96717_REF_VTG1,
+				   MAX96717_REF_VTG1_RCLKEN_Y,
+				   MAX96717_REF_VTG1_RCLKEN_Y);
 	if (ret)
 		return ret;
 
@@ -1167,7 +710,7 @@ static int max96717_mux_set_rclkout(struct max96717_priv *priv, unsigned int gro
 }
 
 static int max96717_mux_set(struct pinctrl_dev *pctldev, unsigned selector,
-				unsigned group)
+			    unsigned group)
 {
 	struct max96717_priv *priv = pinctrl_dev_get_drvdata(pctldev);
 	int ret;
@@ -1185,21 +728,18 @@ static int max96717_mux_set(struct pinctrl_dev *pctldev, unsigned selector,
 
 	return 0;
 }
-
 static int max96717_gpio_get_direction(struct gpio_chip *gc, unsigned int offset)
 {
 	unsigned long config = pinconf_to_config_packed(PIN_CONFIG_OUTPUT_ENABLE, 0);
 	struct max96717_priv *priv = gpiochip_get_data(gc);
 	int ret;
 
-	dev_dbg(priv->dev, "%s()\n", __func__);
-
 	ret = max96717_conf_pin_config_get(priv->pctldev, offset, &config);
 	if (ret)
 		return ret;
 
 	return pinconf_to_config_argument(config) ? GPIO_LINE_DIRECTION_OUT
-						: GPIO_LINE_DIRECTION_IN;
+						  : GPIO_LINE_DIRECTION_IN;
 }
 
 static int max96717_gpio_direction_input(struct gpio_chip *gc, unsigned int offset)
@@ -1211,7 +751,7 @@ static int max96717_gpio_direction_input(struct gpio_chip *gc, unsigned int offs
 }
 
 static int max96717_gpio_direction_output(struct gpio_chip *gc, unsigned int offset,
-					int value)
+					  int value)
 {
 	unsigned long config = pinconf_to_config_packed(PIN_CONFIG_OUTPUT, value);
 	struct max96717_priv *priv = gpiochip_get_data(gc);
@@ -1237,8 +777,6 @@ static void max96717_gpio_set(struct gpio_chip *gc, unsigned int offset, int val
 	unsigned long config = pinconf_to_config_packed(PIN_CONFIG_OUTPUT, value);
 	struct max96717_priv *priv = gpiochip_get_data(gc);
 	int ret;
-
-	dev_dbg(priv->dev, "%s()\n", __func__);
 
 	ret = max96717_conf_pin_config_set_one(priv, offset, config);
 	if (ret)
@@ -1267,34 +805,14 @@ static const struct pinmux_ops max96717_mux_ops = {
 	.set_mux = max96717_mux_set,
 };
 
-static int max96717_wait_for_device(struct max96717_priv *priv)
-{
-	unsigned int i;
-	int ret;
-
-	dev_dbg(priv->dev, "%s()\n", __func__);
-
-	for (i = 0; i < 10; i++) {
-		ret = max96717_read(priv, 0x0);
-		if (ret >= 0)
-			return 0;
-
-		msleep(70);
-
-		dev_dbg(priv->dev, "Retry %u waiting for serializer: %d\n", i, ret);
-	}
-
-	return ret;
-}
-
 static unsigned int max96717_pipe_id(struct max96717_priv *priv,
-					struct max_ser_pipe *pipe)
+				     struct max_ser_pipe *pipe)
 {
 	return priv->info->pipe_hw_ids[pipe->index];
 }
 
 static unsigned int max96717_phy_id(struct max96717_priv *priv,
-					struct max_ser_phy *phy)
+				    struct max_ser_phy *phy)
 {
 	return priv->info->phy_hw_ids[phy->index];
 }
@@ -1307,35 +825,35 @@ static int max96717_log_status(struct max_ser_priv *ser_priv, const char *name)
 	if (!priv->info->supports_tunnel_mode)
 		return 0;
 
-	ret = max96717_read(priv, 0x38f);
+	ret = max96717_read(priv, MAX96717_EXT23);
 	if (ret < 0)
 		return ret;
 
-	dev_info(priv->dev, "%s: \t\ttun_pkt_cnt: %u\n", name, ret);
+	pr_info("%s: \t\ttun_pkt_cnt: %u\n", name, ret);
 
 	return 0;
 }
 
 static int max96717_log_pipe_status(struct max_ser_priv *ser_priv,
-					struct max_ser_pipe *pipe,
-					const char *name)
+				    struct max_ser_pipe *pipe,
+				    const char *name)
 {
 	struct max96717_priv *priv = ser_to_priv(ser_priv);
 	unsigned int index = max96717_pipe_id(priv, pipe);
 	int ret;
 
-	ret = max96717_read(priv, 0x102 + 0x8 * index);
+	ret = max96717_read(priv, MAX96717_VIDEO_TX2(index));
 	if (ret < 0)
 		return ret;
 
-	dev_info(priv->dev, "%s: \tpclkdet: %u\n", name, !!(ret & BIT(7)));
+	pr_info("%s: \tpclkdet: %u\n", name, !!(ret & MAX96717_VIDEO_TX2_PCLKDET));
 
 	return 0;
 }
 
 static int max96717_log_phy_status(struct max_ser_priv *ser_priv,
-				struct max_ser_phy *phy,
-				const char *name)
+				   struct max_ser_phy *phy,
+				   const char *name)
 {
 	struct max96717_priv *priv = ser_to_priv(ser_priv);
 	int ret;
@@ -1343,59 +861,63 @@ static int max96717_log_phy_status(struct max_ser_priv *ser_priv,
 	if (!priv->info->supports_pkt_cnt)
 		return 0;
 
-	ret = max96717_read(priv, 0x38d);
+	ret = max96717_read(priv, MAX96717_EXT21);
 	if (ret < 0)
 		return ret;
 
-	dev_info(priv->dev, "%s: \tphy_pkt_cnt: %u\n", name, ret);
+	pr_info("%s: \tphy_pkt_cnt: %u\n", name, ret);
 
-	ret = max96717_read(priv, 0x38e);
+	ret = max96717_read(priv, MAX96717_EXT22);
 	if (ret < 0)
 		return ret;
 
-	dev_info(priv->dev, "%s: \tcsi_pkt_cnt: %u\n", name, ret);
+	pr_info("%s: \tcsi_pkt_cnt: %u\n", name, ret);
 
-	ret = max96717_read(priv, 0x390);
+	ret = max96717_read(priv, MAX96717_EXT24);
 	if (ret < 0)
 		return ret;
 
-	dev_info(priv->dev, "%s: \tphy_clk_cnt: %u\n", name, ret);
+	pr_info("%s: \tphy_clk_cnt: %u\n", name, ret);
 
 	return 0;
 }
 
 static int max96717_set_pipe_enable(struct max_ser_priv *ser_priv,
-					struct max_ser_pipe *pipe, bool enable)
+				    struct max_ser_pipe *pipe, bool enable)
 {
 	struct max96717_priv *priv = ser_to_priv(ser_priv);
 	unsigned int index = max96717_pipe_id(priv, pipe);
-	unsigned int mask = BIT(index + 4);
-
-	dev_dbg(priv->dev, "%s() - %d\n", __func__, enable);
-
-	return max96717_update_bits(priv, 0x2, mask, enable ? mask : 0);
-}
-
-static int max96717_set_pipe_dt_en(struct max96717_priv *priv,
-				struct max_ser_pipe *pipe,
-				unsigned int i, bool en)
-{
-	unsigned int index = max96717_pipe_id(priv, pipe);
-	unsigned int reg, mask;
+	unsigned int mask = MAX96717_REG2_VID_TX_EN_P(index);
 
 	dev_dbg(priv->dev, "%s()\n", __func__);
 
-	if (i < 2) {
-		reg = 0x314 + index * 2 + i;
-		mask = BIT(6);
-	} else {
-		i -= 2;
-
-		reg = 0x3dc + i;
-		mask = BIT(6);
+	if (enable) {
+		max96717_update_bits(priv, MAX96717_MIPI_RX0,
+					MAX96717_MIPI_RX0_MIPI_RX_RESET,
+					MAX96717_MIPI_RX0_MIPI_RX_RESET);
+		max96717_update_bits(priv, MAX96717_MIPI_RX0,
+					MAX96717_MIPI_RX0_MIPI_RX_RESET,
+					0x00);
 	}
 
-	return max96717_update_bits(priv, reg, mask, en ? mask : 0);
+	return max96717_update_bits(priv, MAX96717_REG2, mask, enable ? mask : 0);
+}
+
+static int max96717_set_pipe_dt_en(struct max96717_priv *priv,
+				   struct max_ser_pipe *pipe,
+				   unsigned int i, bool en)
+{
+	unsigned int index = max96717_pipe_id(priv, pipe);
+	unsigned int reg;
+
+	if (i < 2) {
+		reg = MAX96717_FRONTTOP_12(index, i);
+	} else {
+		reg = MAX96717_EXTA(i - 2);
+	}
+
+	return max96717_update_bits(priv, reg, MAX96717_MEM_DT_EN,
+				   field_prep(MAX96717_MEM_DT_EN, en));
 }
 
 static int max96717_set_pipe_dt(struct max96717_priv *priv,
@@ -1406,21 +928,17 @@ static int max96717_set_pipe_dt(struct max96717_priv *priv,
 	u32 dt = pipe->dts[i];
 	unsigned int reg;
 
-	dev_dbg(priv->dev, "%s()\n", __func__);
+	if (i < 2)
+		reg = MAX96717_FRONTTOP_12(index,  i);
+	else
+		reg = MAX96717_EXTA(i - 2);
 
-	if (i < 2) {
-		reg = 0x314 + index * 2 + i;
-	} else {
-		i -= 2;
-
-		reg = 0x3dc + i;
-	}
-
-	return max96717_update_bits(priv, reg, GENMASK(5, 0), dt);
+	return max96717_update_bits(priv, reg, MAX96717_MEM_DT_SEL,
+				   field_prep(MAX96717_MEM_DT_SEL, dt));
 }
 
 static int max96717_update_pipe_dts(struct max_ser_priv *ser_priv,
-					struct max_ser_pipe *pipe)
+				    struct max_ser_pipe *pipe)
 {
 	struct max96717_priv *priv = ser_to_priv(ser_priv);
 	unsigned int i;
@@ -1449,20 +967,21 @@ static int max96717_update_pipe_dts(struct max_ser_priv *ser_priv,
 }
 
 static int max96717_update_pipe_vcs(struct max_ser_priv *ser_priv,
-					struct max_ser_pipe *pipe)
+				    struct max_ser_pipe *pipe)
 {
 	struct max96717_priv *priv = ser_to_priv(ser_priv);
 	unsigned int index = max96717_pipe_id(priv, pipe);
-	unsigned int reg = 0x309 + 0x2 * index;
 	int ret;
 
 	dev_dbg(priv->dev, "%s()\n", __func__);
 
-	ret = max96717_write(priv, reg, (pipe->vcs >> 0) & 0xff);
+	ret = max96717_write(priv, MAX96717_FRONTTOP_1(index),
+				   (pipe->vcs >> 0) & 0xff);
 	if (ret)
 		return ret;
 
-	return max96717_write(priv, reg + 0x1, (pipe->vcs >> 8) & 0xff);
+	return max96717_write(priv, MAX96717_FRONTTOP_2(index),
+				   (pipe->vcs >> 8) & 0xff);
 }
 
 static int max96717_init_lane_config(struct max96717_priv *priv)
@@ -1470,7 +989,6 @@ static int max96717_init_lane_config(struct max96717_priv *priv)
 	struct max_ser_priv *ser_priv = &priv->ser_priv;
 	struct max_ser_phy *phy;
 	unsigned int i, j;
-	int ret;
 
 	dev_dbg(priv->dev, "%s() - lanes [%d], phys [%d]\n",
 		__func__, priv->info->num_lane_configs, priv->info->num_phys);
@@ -1482,7 +1000,7 @@ static int max96717_init_lane_config(struct max96717_priv *priv)
 			phy = max_ser_phy_by_id(ser_priv, j);
 
 			if (phy->enabled && phy->mipi.num_data_lanes !=
-				priv->info->lane_configs[i][j]) {
+			    priv->info->lane_configs[i][j]) {
 				matching = false;
 				break;
 			}
@@ -1497,68 +1015,62 @@ static int max96717_init_lane_config(struct max96717_priv *priv)
 		return -EINVAL;
 	}
 
-	ret = max96717_update_bits(priv, 0x330, GENMASK(2, 0),
-				priv->info->phy_configs[i]);
-	if (ret)
-		return ret;
-
 	return 0;
 }
 
 static int max96717_init(struct max_ser_priv *ser_priv)
 {
 	struct max96717_priv *priv = ser_to_priv(ser_priv);
-	unsigned int mask;
 	int ret;
 
 	dev_dbg(priv->dev, "%s()\n", __func__);
+
 	/*
-	* Set CMU2 PFDDIV to 1.1V for correct functionality of the device,
-	* as mentioned in the datasheet, under section MANDATORY REGISTER PROGRAMMING.
-	*/
-	ret = max96717_update_bits(priv, 0x302, 0x70, 0x10);
+	 * Set CMU2 PFDDIV to 1.1V for correct functionality of the device,
+	 * as mentioned in the datasheet, under section MANDATORY REGISTER PROGRAMMING.
+	 */
+	ret = max96717_update_bits(priv, MAX96717_CMU2,
+				   MAX96717_CMU2_PFDDIV_RSHORT,
+				   field_prep(MAX96717_CMU2_PFDDIV_RSHORT,
+					    MAX96717_CMU2_PFDDIV_RSHORT_1_1V));
 	if (ret)
 		return ret;
 
-	/* Enable GMSL Negative Output in Coax Mode for Optimal Performance */
-	ret = max96717_write(priv, 0x14ce, 0x19);
+	/* Enable GMSL negative output in coax mode for optimal performance */
+	ret = max96717_update_bits(priv, MAX96717_RLMSCE,
+				   MAX96717_RLMSCE_ENMINUS_MAN |
+				   MAX96717_RLMSCE_ENMINUS_REG,
+				   field_prep(MAX96717_RLMSCE_ENMINUS_MAN,
+						MAX96717_RLMSCE_ENMINUS_MAN) |
+				   field_prep(MAX96717_RLMSCE_ENMINUS_REG,
+						MAX96717_RLMSCE_ENMINUS_REG));
 	if (ret)
 		return ret;
 
 	if (priv->info->supports_tunnel_mode) {
-		mask = BIT(7);
-		dev_info(priv->dev, "%s() - set tunnel_mode [%d]\n",
-			__func__, ser_priv->tunnel_mode);
 
-		ret = max96717_update_bits(priv, 0x383, mask,
-					ser_priv->tunnel_mode
-					? mask : 0x00);
-		if (ret)
-			return ret;
-
-		ret = max96717_update_bits(priv, 0x10, BIT(5), BIT(5));
-		if (ret)
-			return ret;
-		msleep(70);
-
-		ret = max96717_wait_for_device(priv);
+		ret = max96717_update_bits(priv, MAX96717_EXT11,
+					   MAX96717_EXT11_TUN_MODE,
+				   	   field_prep(MAX96717_EXT11_TUN_MODE,
+					    	ser_priv->tunnel_mode));
 		if (ret)
 			return ret;
 	}
 
 	/* Disable ports. */
-	ret = max96717_update_bits(priv, 0x308, 0x20, 0x00);
+	ret = max96717_update_bits(priv, MAX96717_FRONTTOP_0, GENMASK(5, 4), 0x00);
+	if (ret)
+		return ret;
+
+	/* Reset pipe to ports mapping. */
+	ret = max96717_update_bits(priv, MAX96717_FRONTTOP_0, GENMASK(3, 0), 0x00);
 	if (ret)
 		return ret;
 
 	/* Disable pipes. */
-	ret = max96717_write(priv, 0x311, 0x00);
+	ret = max96717_write(priv, MAX96717_FRONTTOP_9, 0x00);
 	if (ret)
 		return ret;
-
-	/* Set I2C to Fast-mode speed (400Kbps) */
-	ret = max96717_update_bits(priv, 0x40, GENMASK(5, 4), 0x10);
-	ret = max96717_update_bits(priv, 0x41, GENMASK(6, 4), 0x50);
 
 	ret = max96717_init_lane_config(priv);
 	if (ret)
@@ -1567,39 +1079,32 @@ static int max96717_init(struct max_ser_priv *ser_priv)
 	return 0;
 }
 
-static int max96717_init_i2c_xlate(struct max_ser_priv *ser_priv)
+static int max96717_init_i2c_xlate(struct max_ser_priv *ser_priv, unsigned int i)
 {
 	struct max96717_priv *priv = ser_to_priv(ser_priv);
-	unsigned int reg;
-	unsigned int i;
 	int ret;
 
 	dev_dbg(priv->dev, "%s()\n", __func__);
 
-	for (i = 0; i < ser_priv->ops->num_i2c_xlates; i++) {
-		u8 src = 0, dst = 0;
+	ret = max96717_update_bits(priv, MAX96717_I2C_2(i),
+					MAX96717_I2C_2_SRC,
+					field_prep(MAX96717_I2C_2_SRC,
+						ser_priv->i2c_xlates[i].src));
+	if (ret)
+		return ret;
 
-		if (i < ser_priv->num_i2c_xlates) {
-			src = ser_priv->i2c_xlates[i].src;
-			dst = ser_priv->i2c_xlates[i].dst;
-		}
-
-		reg = 0x42 + 0x2 * i;
-
-		ret = max96717_write(priv, reg, src << 1);
-		if (ret)
-			return ret;
-
-		ret = max96717_write(priv, reg + 1, dst << 1);
-		if (ret)
-			return ret;
-	}
+	ret = max96717_update_bits(priv, MAX96717_I2C_3(i),
+					MAX96717_I2C_3_DST,
+					field_prep(MAX96717_I2C_3_DST,
+						ser_priv->i2c_xlates[i].dst));
+	if (ret)
+		return ret;
 
 	return 0;
 }
 
 static int max96717_init_phy(struct max_ser_priv *ser_priv,
-				struct max_ser_phy *phy)
+			     struct max_ser_phy *phy)
 {
 	struct max96717_priv *priv = ser_to_priv(ser_priv);
 	unsigned int num_data_lanes = phy->mipi.num_data_lanes;
@@ -1610,28 +1115,25 @@ static int max96717_init_phy(struct max_ser_priv *ser_priv,
 
 	dev_dbg(priv->dev, "%s()\n", __func__);
 
-	if (num_data_lanes == 4)
-		val = 0x3;
-	else
-		val = 0x1;
-
-	shift = index == 1 ? 4 : 0;
-	mask = GENMASK(1, 0);
-
 	/* Configure a lane count. */
 	/* TODO: Add support for 1-lane configurations. */
-	ret = max96717_update_bits(priv, 0x331, mask << shift, val << shift);
+	ret = max96717_update_bits(priv, MAX96717_MIPI_RX1,
+				   MAX96717_MIPI_RX1_CTRL_NUM_LANES,
+				   field_prep(MAX96717_MIPI_RX1_CTRL_NUM_LANES,
+					    num_data_lanes - 1));
 	if (ret)
 		return ret;
 
 	/* Configure lane mapping. */
 	/* TODO: Add support for lane swapping. */
 	/* TODO: Handle PHY A. */
-	ret = max96717_update_bits(priv, 0x332, 0xf0, 0xe0);
+	ret = max96717_update_bits(priv, MAX96717_MIPI_RX2,
+				   MAX96717_MIPI_RX2_PHY1_LANE_MAP, 0xe0);
 	if (ret)
 		return ret;
 
-	ret = max96717_update_bits(priv, 0x333, 0x0f, 0x04);
+	ret = max96717_update_bits(priv, MAX96717_MIPI_RX3,
+				   MAX96717_MIPI_RX3_PHY2_LANE_MAP, 0x04);
 	if (ret)
 		return ret;
 
@@ -1642,7 +1144,7 @@ static int max96717_init_phy(struct max_ser_priv *ser_priv,
 	for (i = 0; i < 3 && i < num_data_lanes + 1; i++)
 		if (phy->mipi.lane_polarities[i])
 			val |= BIT(i == 0 ? 2 : i - 1);
-	ret = max96717_update_bits(priv, 0x335, 0x7, val);
+	ret = max96717_update_bits(priv, MAX96717_MIPI_RX5, GENMASK(2, 0), val);
 	if (ret)
 		return ret;
 
@@ -1653,25 +1155,24 @@ static int max96717_init_phy(struct max_ser_priv *ser_priv,
 	for (i = 3; i < num_data_lanes + 1; i++)
 		if (phy->mipi.lane_polarities[i])
 			val |= BIT(i - 3);
-	ret = max96717_update_bits(priv, 0x334, mask << shift, val << shift);
+	ret = max96717_update_bits(priv, MAX96717_MIPI_RX4, mask << shift, val << shift);
 	if (ret)
 		return ret;
 
 	if (priv->info->supports_noncontinuous_clock) {
-		mask = BIT(6);
-
-		ret = max96717_update_bits(priv, 0x330, mask,
-					phy->mipi.flags &
-					V4L2_MBUS_CSI2_NONCONTINUOUS_CLOCK
-					? mask : 0x00);
+		ret = max96717_update_bits(priv, MAX96717_MIPI_RX0,
+					   MAX96717_MIPI_RX0_NONCONTCLK_EN,
+					   phy->mipi.flags &
+					   V4L2_MBUS_CSI2_NONCONTINUOUS_CLOCK
+					   ? MAX96717_MIPI_RX0_NONCONTCLK_EN : 0x00);
 		if (ret)
 			return ret;
 	}
 
 	/* Enable PHY. */
-	shift = 4;
-	mask = BIT(index) << shift;
-	ret = max96717_update_bits(priv, 0x308, mask, mask);
+	ret = max96717_update_bits(priv, MAX96717_FRONTTOP_0,
+				   MAX96717_FRONTTOP_0_START_PORT(index),
+				   MAX96717_FRONTTOP_0_START_PORT(index));
 	if (ret)
 		return ret;
 
@@ -1683,17 +1184,16 @@ static int max96717_init_pipe_stream_id(struct max96717_priv *priv,
 {
 	unsigned int index = max96717_pipe_id(priv, pipe);
 
-	return max96717_write(priv, 0x53 + 0x4 * index, pipe->stream_id);
+	return max96717_write(priv, MAX96717_TX3(index), pipe->stream_id);
 }
 
 static int max96717_init_pipe(struct max_ser_priv *ser_priv,
-				struct max_ser_pipe *pipe)
+			      struct max_ser_pipe *pipe)
 {
 	struct max_ser_phy *phy = max_ser_pipe_phy(ser_priv, pipe);
 	struct max96717_priv *priv = ser_to_priv(ser_priv);
 	unsigned int index = max96717_pipe_id(priv, pipe);
 	unsigned int phy_id = max96717_phy_id(priv, phy);
-	unsigned int reg, val, shift, mask;
 	int ret;
 
 	dev_dbg(priv->dev, "%s()\n", __func__);
@@ -1703,58 +1203,67 @@ static int max96717_init_pipe(struct max_ser_priv *ser_priv,
 		return ret;
 
 	/* Map pipe to PHY. */
-	mask = BIT(index);
-	val = phy_id == 1 ? mask : 0;
-	ret = max96717_update_bits(priv, 0x308, mask, val);
+	ret = max96717_update_bits(priv, MAX96717_FRONTTOP_0,
+				   MAX96717_FRONTTOP_0_CLK_SEL_P(index),
+				   field_prep(MAX96717_FRONTTOP_0_CLK_SEL_P(index), phy_id));
 	if (ret)
 		return ret;
 
 	/* Enable pipe output to PHY. */
-	shift = phy_id == 1 ? 4 : 0;
-	mask = BIT(index) << shift;
-	ret = max96717_update_bits(priv, 0x311, mask, mask);
+	ret = max96717_update_bits(priv, MAX96717_FRONTTOP_9,
+				   MAX96717_FRONTTOP_9_START_PORT(index, phy_id),
+				   MAX96717_FRONTTOP_9_START_PORT(index, phy_id));
 	if (ret)
 		return ret;
 
 	/* Set 8bit double mode. */
-	mask = BIT(index);
-	ret = max96717_update_bits(priv, 0x312, mask, pipe->dbl8 ? mask : 0);
+	ret = max96717_update_bits(priv, MAX96717_FRONTTOP_10,
+				   MAX96717_FRONTTOP_10_BPP8DBL(index),
+				   field_prep(MAX96717_FRONTTOP_10_BPP8DBL(index),
+				   		pipe->dbl8));
 	if (ret)
 		return ret;
 
 	/* Set 10bit double mode. */
-	mask = BIT(index);
-	ret = max96717_update_bits(priv, 0x313, mask, pipe->dbl10 ? mask : 0);
+	ret = max96717_update_bits(priv, MAX96717_FRONTTOP_11,
+				   MAX96717_FRONTTOP_11_BPP10DBL(index),
+				   field_prep(MAX96717_FRONTTOP_11_BPP10DBL(index),
+				   		pipe->dbl10));
 	if (ret)
 		return ret;
 
 	/* Set 12bit double mode. */
-	mask = BIT(index) << 4;
-	ret = max96717_update_bits(priv, 0x313, mask, pipe->dbl12 ? mask : 0);
+	ret = max96717_update_bits(priv, MAX96717_FRONTTOP_11,
+				   MAX96717_FRONTTOP_11_BPP12DBL(index),
+				   field_prep(MAX96717_FRONTTOP_11_BPP12DBL(index),
+				   		pipe->dbl12));
 	if (ret)
 		return ret;
 
 	/* Set override soft BPP. */
-	reg = 0x31c + index;
-	mask = BIT(5);
-	ret = max96717_update_bits(priv, reg, mask, pipe->soft_bpp ? mask : 0);
-	if (ret)
-		return ret;
-
-	/* Set soft BPP. */
-	ret = max96717_update_bits(priv, reg, GENMASK(4, 0), pipe->soft_bpp);
+	ret = max96717_update_bits(priv, MAX96717_FRONTTOP_20(index),
+				   MAX96717_FRONTTOP_20_SOFT_BPP_EN |
+				   MAX96717_FRONTTOP_20_SOFT_BPP,
+				   field_prep(MAX96717_FRONTTOP_20_SOFT_BPP_EN,
+				   		!!pipe->soft_bpp) |
+				   field_prep(MAX96717_FRONTTOP_20_SOFT_BPP,
+				   		pipe->soft_bpp));
 	if (ret)
 		return ret;
 
 	/* Set override BPP. */
-	reg = 0x100 + 0x8 * index;
-	mask = BIT(3);
-	ret = max96717_update_bits(priv, reg, mask, pipe->bpp ? 0 : mask);
+	ret = max96717_update_bits(priv, MAX96717_VIDEO_TX0(index),
+				   MAX96717_VIDEO_TX0_AUTO_BPP,
+				   field_prep(MAX96717_VIDEO_TX0_AUTO_BPP,
+				   		!pipe->bpp));
 	if (ret)
 		return ret;
 
 	/* Set BPP. */
-	ret = max96717_update_bits(priv, reg + 1, GENMASK(5, 0), pipe->bpp);
+	ret = max96717_update_bits(priv, MAX96717_VIDEO_TX1(index),
+				   MAX96717_VIDEO_TX1_BPP,
+				   field_prep(MAX96717_VIDEO_TX1_BPP,
+				   		pipe->bpp));
 	if (ret)
 		return ret;
 
@@ -1772,8 +1281,6 @@ static int max96717_init_pipes_stream_ids(struct max96717_priv *priv)
 	struct max_ser_pipe *pipe;
 	unsigned int i;
 	int ret;
-
-	dev_dbg(priv->dev, "%s()\n", __func__);
 
 	for (i = 0; i < ser_priv->ops->num_pipes; i++) {
 		pipe = max_ser_pipe_by_id(ser_priv, i);
@@ -1837,14 +1344,7 @@ static int max96717_post_init(struct max_ser_priv *ser_priv)
 		mutex_unlock(&ser_priv->lock);
 		if (ret)
 			return -EINVAL;
-
-		max_ser_ch_enable(sd_priv, true);
-		if (ret)
-			return -EINVAL;
 	}
-
-	max96717_update_bits(priv, 0x330, 0x08, 0x08);
-	max96717_update_bits(priv, 0x330, 0x08, 0x00);
 
 	return 0;
 }
@@ -1863,6 +1363,24 @@ static const struct max_ser_ops max96717_ops = {
 	.init_pipe = max96717_init_pipe,
 	.post_init = max96717_post_init,
 };
+
+static int max96717_wait_for_device(struct max96717_priv *priv)
+{
+	unsigned int i;
+	int ret;
+
+	for (i = 0; i < 10; i++) {
+		ret = max96717_read(priv, MAX96717_REG0);
+		if (ret >= 0)
+			return 0;
+
+		msleep(100);
+
+		dev_err(priv->dev, "Retry %u waiting for serializer: %d\n", i, ret);
+	}
+
+	return ret;
+}
 
 static int max96717_probe(struct i2c_client *client)
 {
@@ -1910,10 +1428,8 @@ static int max96717_probe(struct i2c_client *client)
 	priv->ser_priv.ops = ops;
 
 	ret = max96717_wait_for_device(priv);
-	if (ret) {
-		dev_err(dev, "Failed waiting for MAX96717, err: %d\n", ret);
+	if (ret)
 		return ret;
-	}
 
 	/* Register pin controller */
 	priv->pctldesc = (struct pinctrl_desc) {
@@ -1928,7 +1444,7 @@ static int max96717_probe(struct i2c_client *client)
 		.num_custom_params = ARRAY_SIZE(max96717_cfg_params),
 	};
 
-	ret = devm_pinctrl_register_and_init(priv->dev, &priv->pctldesc, priv, &priv->pctldev);
+	ret = devm_pinctrl_register_and_init(dev, &priv->pctldesc, priv, &priv->pctldev);
 	if (ret)
 		return ret;
 
@@ -1941,7 +1457,7 @@ static int max96717_probe(struct i2c_client *client)
 		.label = MAX96717_GPIOCHIP_NAME,
 		.base = -1,
 		.ngpio = MAX96717_GPIO_NUM,
-		.parent = priv->dev,
+		.parent = dev,
 		.can_sleep = true,
 		.request = gpiochip_generic_request,
 		.free = gpiochip_generic_free,
@@ -1953,7 +1469,7 @@ static int max96717_probe(struct i2c_client *client)
 		.set = max96717_gpio_set,
 	};
 
-	ret = devm_gpiochip_add_data(priv->dev, &priv->gc, priv);
+	ret = devm_gpiochip_add_data(dev, &priv->gc, priv);
 	if (ret)
 		return ret;
 
@@ -1988,7 +1504,7 @@ static const struct max96717_chip_info max96717_info = {
 };
 
 static const struct of_device_id max96717_of_ids[] = {
-	{ .compatible = "maxim,max96717", .data = &max96717_info },
+	{ .compatible = "maxim,max96717_tn", .data = &max96717_info },
 	{ }
 };
 MODULE_DEVICE_TABLE(of, max96717_of_ids);
