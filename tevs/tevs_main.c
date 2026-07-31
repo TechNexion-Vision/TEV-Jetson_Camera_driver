@@ -6,9 +6,15 @@
 #include <media/tegra-v4l2-camera.h>
 #include <media/camera_common.h>
 #include <media/v4l2-fwnode.h>
+
 #include "tevs_tbls.h"
 
+#define GMSL_SERDES_CTRL
 #define DRIVER_NAME "tevs"
+
+#ifdef GMSL_SERDES_CTRL
+#include "../maxim-gmsl/max_serdes.h"
+#endif
 
 /* Define host command register of TEVS information page */
 #define HOST_COMMAND_TEVS_INFO_VERSION_MSB 						(0x3000)
@@ -321,6 +327,14 @@ struct tevs {
 	struct gpio_desc *reset_gpio;
 	struct gpio_desc *standby_gpio;
 
+#ifdef GMSL_SERDES_CTRL
+	struct device_node *gmsl_ser_np;
+	struct device_node *gmsl_des_np;
+	u32 gmsl_ser_channel;
+	u32 gmsl_des_channel;
+	bool gmsl_enabled;
+#endif
+
 	struct v4l2_subdev_ops subdev_ops;
 	struct v4l2_subdev_video_ops video_ops;
 
@@ -391,6 +405,109 @@ static struct tegracam_ctrl_ops tevs_nv_ctrl_ops = {
 	.set_group_hold = tevs_set_group_hold,
 };
 #endif
+
+#ifdef GMSL_SERDES_CTRL
+static void tevs_of_node_put(void *data)
+{
+	of_node_put(data);
+}
+
+static int tevs_gmsl_parse_and_wait(struct tevs *tevs)
+{
+	int ret;
+
+	tevs->gmsl_ser_np = of_parse_phandle(tevs->dev->of_node,
+					     "technexion,gmsl-ser", 0);
+	if (!tevs->gmsl_ser_np)
+		return 0;
+
+	ret = devm_add_action_or_reset(tevs->dev, tevs_of_node_put,
+				       tevs->gmsl_ser_np);
+	if (ret)
+		return ret;
+
+	of_property_read_u32(tevs->dev->of_node,
+			     "technexion,gmsl-ser-channel",
+			     &tevs->gmsl_ser_channel);
+
+	tevs->gmsl_des_np = of_parse_phandle(tevs->dev->of_node,
+					     "technexion,gmsl-des", 0);
+	if (!tevs->gmsl_des_np)
+		return -EINVAL;
+
+	ret = devm_add_action_or_reset(tevs->dev, tevs_of_node_put,
+				       tevs->gmsl_des_np);
+	if (ret)
+		return ret;
+
+	ret = of_property_read_u32(tevs->dev->of_node,
+				   "technexion,gmsl-des-channel",
+				   &tevs->gmsl_des_channel);
+	if (ret)
+		return ret;
+
+	/*
+	 * TEVS and the deserializer & serializer are children of the
+	 * same physical I2C adapter and may otherwise probe in parallel.
+	 * The deserializer temporarily exposes one remote link at
+	 * a time while assigning serializer addresses.
+	 */
+	ret = max_des_is_ready_by_node(tevs->gmsl_des_np);
+	if (ret)
+		return dev_err_probe(tevs->dev, ret,
+				     "waiting for GMSL deserializer\n");
+
+	ret = max_ser_is_ready_by_node(tevs->gmsl_ser_np);
+	if (ret)
+		return dev_err_probe(tevs->dev, ret,
+				     "waiting for GMSL serializer\n");
+
+	return 0;
+}
+
+static int tevs_gmsl_enable(struct tevs *tevs, bool enable)
+{
+	int ret;
+	int ret2;
+
+	if (!tevs->gmsl_ser_np || !tevs->gmsl_des_np)
+		return 0;
+
+	if (tevs->gmsl_enabled == enable)
+		return 0;
+
+	if (enable) {
+		ret = max_des_ch_enable_by_node(tevs->gmsl_des_np,
+						tevs->gmsl_des_channel, true);
+		if (ret)
+			return ret;
+
+		ret = max_ser_ch_enable_by_node(tevs->gmsl_ser_np,
+						tevs->gmsl_ser_channel, true);
+		if (ret) {
+			max_des_ch_enable_by_node(tevs->gmsl_des_np,
+						  tevs->gmsl_des_channel, false);
+			return ret;
+		}
+
+		tevs->gmsl_enabled = true;
+		return 0;
+	}
+
+	ret = max_ser_ch_enable_by_node(tevs->gmsl_ser_np,
+					tevs->gmsl_ser_channel, false);
+	ret2 = max_des_ch_enable_by_node(tevs->gmsl_des_np,
+					 tevs->gmsl_des_channel, false);
+	if (!ret)
+		ret = ret2;
+	if (!ret)
+		tevs->gmsl_enabled = false;
+
+	return ret;
+}
+#endif
+
+static int tevs_set_trigger_mode(struct tevs *tevs, s32 value);
 
 static struct tevs* _to_tevs_priv(struct v4l2_ctrl *ctrl)
 {
@@ -1614,7 +1731,6 @@ error:
 static void tevs_ctrls_free(struct tevs *tevs)
 {
 	v4l2_ctrl_handler_free(&tevs->ctrls);
-	// mutex_destroy(&tevs->lock);
 }
 
 static int tevs_power_on(struct camera_common_data *s_data)
@@ -1809,6 +1925,13 @@ static int tevs_start_streaming(struct tegracam_device *tc_dev)
 	    tevs_sensor_table[tevs->selected_sensor].res_list_size)
 		return -EINVAL;
 
+
+#ifdef GMSL_SERDES_CTRL
+	ret = tevs_gmsl_enable(tevs, true);
+	if (ret)
+		return ret;
+#endif
+
 	ret = tevs_standby(tevs, 0);
 	if (ret)
 		return ret;
@@ -1899,6 +2022,12 @@ static int tevs_stop_streaming(struct tegracam_device *tc_dev)
 {
 	struct tevs *tevs = tc_dev->priv;
 	int ret = 0;
+
+#ifdef GMSL_SERDES_CTRL
+	ret = tevs_gmsl_enable(tevs, false);
+	if (ret)
+		return ret;
+#endif
 
 	if (tevs->trigger_mode) {
 		ret = tevs_write_trigger_mode(tevs, TEVS_TRIGGER_MODE_DISABLE);
@@ -2291,6 +2420,14 @@ static int tevs_probe(struct i2c_client *client)
 		return -ENOMEM;
 	}
 
+	tevs->dev = dev;
+
+#ifdef GMSL_SERDES_CTRL
+	ret = tevs_gmsl_parse_and_wait(tevs);
+	if (ret)
+		return ret;
+#endif
+
 	tc_dev = devm_kzalloc(dev,
 			sizeof(struct tegracam_device), GFP_KERNEL);
 	if (!tc_dev)
@@ -2309,7 +2446,6 @@ static int tevs_probe(struct i2c_client *client)
 		return ret;
 	}
 
-	tevs->dev = dev;
 	tevs->tc_dev = tc_dev;
 	tevs->s_data = tc_dev->s_data;
 	tevs->regmap = tc_dev->s_data->regmap;
