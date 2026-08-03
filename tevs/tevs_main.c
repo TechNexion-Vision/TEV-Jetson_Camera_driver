@@ -336,7 +336,7 @@ struct tevs {
 #endif
 
 	struct v4l2_subdev_ops subdev_ops;
-	struct v4l2_subdev_video_ops video_ops;
+	struct v4l2_subdev_pad_ops pad_ops;
 
 	u16 chip_id;
 	int data_lanes;
@@ -2089,14 +2089,15 @@ static inline int tevs_write_reg(struct camera_common_data *s_data,
 	return err;
 }
 
-static int tevs_g_frame_interval(struct v4l2_subdev *sd,
-				 struct v4l2_subdev_frame_interval *interval)
+static int tevs_get_frame_interval(struct v4l2_subdev *sd,
+				   struct v4l2_subdev_state *state,
+				   struct v4l2_subdev_frame_interval *interval)
 {
 	struct camera_common_data *s_data =
 		to_camera_common_data(sd->dev);
 	struct tevs *tevs = s_data ? s_data->priv : NULL;
 
-	if (!tevs->fps)
+	if (!tevs || !tevs->fps)
 		return -EINVAL;
 
 	interval->interval.numerator = 1;
@@ -2107,14 +2108,18 @@ static int tevs_g_frame_interval(struct v4l2_subdev *sd,
 	return 0;
 }
 
-static int tevs_s_frame_interval(struct v4l2_subdev *sd,
-				 struct v4l2_subdev_frame_interval *interval)
+static int tevs_set_frame_interval(struct v4l2_subdev *sd,
+				   struct v4l2_subdev_state *state,
+				   struct v4l2_subdev_frame_interval *interval)
 {
 	struct camera_common_data *s_data =
 		to_camera_common_data(sd->dev);
 	struct tevs *tevs = s_data ? s_data->priv : NULL;
 	unsigned int fps;
 	int ret;
+
+	if (!tevs)
+		return -EINVAL;
 
 	if (!interval->interval.numerator ||
 	    !interval->interval.denominator)
@@ -2383,22 +2388,21 @@ error_out:
 }
 
 /*
- * tegracam_v4l2 uses the same getter for both g_frame_interval and
- * s_frame_interval.  Keep the shared tegracam operations, but override the
- * two frame-interval callbacks for TEVS so VIDIOC_S_PARM reaches the sensor.
+ * Keep the shared tegracam operations, but override the frame-interval pad
+ * callbacks for TEVS so VIDIOC_G_PARM and VIDIOC_S_PARM reach the sensor.
  */
 static int tevs_install_frame_interval_ops(struct tevs *tevs)
 {
 	struct v4l2_subdev *sd = tevs->v4l2_subdev;
 
-	if (!sd->ops || !sd->ops->video)
+	if (!sd->ops || !sd->ops->pad)
 		return -EINVAL;
 
 	tevs->subdev_ops = *sd->ops;
-	tevs->video_ops = *sd->ops->video;
-	tevs->video_ops.g_frame_interval = tevs_g_frame_interval;
-	tevs->video_ops.s_frame_interval = tevs_s_frame_interval;
-	tevs->subdev_ops.video = &tevs->video_ops;
+	tevs->pad_ops = *sd->ops->pad;
+	tevs->pad_ops.get_frame_interval = tevs_get_frame_interval;
+	tevs->pad_ops.set_frame_interval = tevs_set_frame_interval;
+	tevs->subdev_ops.pad = &tevs->pad_ops;
 	sd->ops = &tevs->subdev_ops;
 
 	return 0;
@@ -2467,11 +2471,6 @@ static int tevs_probe(struct i2c_client *client)
 		return ret;
 	}
 
-	/*
-	 * tegracam_v4l2 uses the same getter for both g_frame_interval and
-	 * s_frame_interval.  Keep the shared tegracam operations, but override the
-	 * two frame-interval callbacks for TEVS so VIDIOC_S_PARM reaches the sensor.
-	 */
 	ret = tevs_install_frame_interval_ops(tevs);
 	if (ret) {
 		dev_err(dev, "failed to install frame interval operations\n");
