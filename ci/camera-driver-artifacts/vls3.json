@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "kind": "camera-driver-artifact-fragment",
+  "family": "vls3",
+  "artifacts": [
+    {
+      "id": "vls3",
+      "makeDirectory": "vls3",
+      "makeTarget": "vls3",
+      "output": "vls3.ko",
+      "installGroup": "vls3",
+      "dependsOn": [],
+      "legacyOutputs": []
+    }
+  ]
+}
