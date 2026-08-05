@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://technexion.com/schemas/camera-driver-artifacts-v1.json",
+  "title": "TechNexion camera driver artifact catalog v1",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "kind", "fragments"],
+      "properties": {
+        "schemaVersion": {"const": 1},
+        "kind": {"const": "camera-driver-artifact-index"},
+        "fragments": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^ci/camera-driver-artifacts/.+\\.json$"}
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "kind", "family", "artifacts"],
+      "properties": {
+        "schemaVersion": {"const": 1},
+        "kind": {"const": "camera-driver-artifact-fragment"},
+        "family": {"type": "string", "minLength": 1},
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id", "makeDirectory", "makeTarget", "output",
+              "installGroup", "dependsOn", "legacyOutputs"
+            ],
+            "properties": {
+              "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9.-]*$"},
+              "makeDirectory": {"type": "string", "minLength": 1},
+              "makeTarget": {"type": "string", "minLength": 1},
+              "output": {"type": "string", "pattern": "^[A-Za-z0-9_.+-]+\\.ko$"},
+              "installGroup": {"type": "string", "minLength": 1},
+              "dependsOn": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+              "legacyOutputs": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {"type": "string", "pattern": "^[A-Za-z0-9_.+-]+\\.ko$"}
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

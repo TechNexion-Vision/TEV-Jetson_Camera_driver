@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "kind": "camera-driver-artifact-index",
+  "fragments": [
+    "ci/camera-driver-artifacts/tevs.json",
+    "ci/camera-driver-artifacts/vls3.json",
+    "ci/camera-driver-artifacts/maxim-gmsl.json"
+  ]
+}

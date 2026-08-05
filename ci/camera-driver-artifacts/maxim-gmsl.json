@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "kind": "camera-driver-artifact-fragment",
+  "family": "maxim-gmsl",
+  "artifacts": [
+    {
+      "id": "max-serdes-common",
+      "makeDirectory": "maxim-gmsl",
+      "makeTarget": "max_serdes_all_tn",
+      "output": "max_serdes_all_tn.ko",
+      "installGroup": "maxim-gmsl",
+      "dependsOn": [],
+      "legacyOutputs": []
+    },
+    {
+      "id": "max96717",
+      "makeDirectory": "maxim-gmsl",
+      "makeTarget": "max96717_tn",
+      "output": "max96717_tn.ko",
+      "installGroup": "maxim-gmsl",
+      "dependsOn": ["max-serdes-common"],
+      "legacyOutputs": ["max96717.ko"]
+    },
+    {
+      "id": "max96724",
+      "makeDirectory": "maxim-gmsl",
+      "makeTarget": "max96724_tn",
+      "output": "max96724_tn.ko",
+      "installGroup": "maxim-gmsl",
+      "dependsOn": ["max-serdes-common"],
+      "legacyOutputs": ["max96724.ko"]
+    },
+    {
+      "id": "max96712",
+      "makeDirectory": "maxim-gmsl",
+      "makeTarget": "max96712_tn",
+      "output": "max96712_tn.ko",
+      "installGroup": "maxim-gmsl",
+      "dependsOn": ["max-serdes-common"],
+      "legacyOutputs": []
+    },
+    {
+      "id": "max9296a",
+      "makeDirectory": "maxim-gmsl",
+      "makeTarget": "max9296a_tn",
+      "output": "max9296a_tn.ko",
+      "installGroup": "maxim-gmsl",
+      "dependsOn": ["max-serdes-common"],
+      "legacyOutputs": ["max9296a.ko"]
+    },
+    {
+      "id": "max96716a",
+      "makeDirectory": "maxim-gmsl",
+      "makeTarget": "max96716a_tn",
+      "output": "max96716a_tn.ko",
+      "installGroup": "maxim-gmsl",
+      "dependsOn": ["max-serdes-common"],
+      "legacyOutputs": ["max96716a.ko"]
+    }
+  ]
+}
