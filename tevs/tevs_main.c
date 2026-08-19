@@ -1375,13 +1375,9 @@ static int tevs_ctrls_init(struct tevs *tevs)
 
 	ctrl_hdl = tevs->s_data->tegracam_ctrl_hdl;
 
-	if (ctrl_hdl == NULL) {
-		dev_info(&tevs->tc_dev->client->dev,"init control handler...\n");
-		ret = v4l2_ctrl_handler_init(&ctrl_hdl->ctrl_handler, 26);
-		if (ret) {
-			dev_err(&tevs->tc_dev->client->dev,"init handler fail\n");
-			return ret;
-		}
+	if (!ctrl_hdl) {
+		dev_err(tevs->dev, "missing tegracam control handler\n");
+		return -EINVAL;
 	}
 
 	ret = tevs_i2c_read_16b(tevs, TEVS_BRIGHTNESS, &val);
@@ -1420,7 +1416,15 @@ static int tevs_ctrls_init(struct tevs *tevs)
 					     V4L2_CID_SATURATION, ctrl_min,
 					     ctrl_max, 1, ctrl_def);
 
-	tevs->awb = v4l2_ctrl_new_custom(&ctrl_hdl->ctrl_handler, &tevs_awb_mode, NULL);
+	tevs->awb = v4l2_ctrl_new_custom(&ctrl_hdl->ctrl_handler,
+					 &tevs_awb_mode, NULL);
+	if (!tevs->awb) {
+		ret = ctrl_hdl->ctrl_handler.error;
+		if (!ret)
+			ret = -ENOMEM;
+		dev_err(tevs->dev, "failed to create AWB control: %d\n", ret);
+		goto error;
+	}
 	ret = tevs_i2c_read_16b(tevs, TEVS_AWB_CTRL_MODE, &val);
 	if (ret)
 		goto error;
