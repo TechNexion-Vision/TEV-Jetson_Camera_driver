@@ -506,8 +506,6 @@ static int tevs_gmsl_enable(struct tevs *tevs, bool enable)
 }
 #endif
 
-static int tevs_set_trigger_mode(struct tevs *tevs, s32 value);
-
 static struct tevs* _to_tevs_priv(struct v4l2_ctrl *ctrl)
 {
 	struct tegracam_ctrl_handler *ctrl_hdl =
@@ -1097,7 +1095,7 @@ static int tevs_set_bsl_mode(struct tevs *tevs, s32 mode)
 			}
 		}
 
-		if (!tevs_init_setting(tevs)) {
+		if (tevs_init_setting(tevs)) {
 			dev_err(tevs->dev, "init setting failed\n");
 			return -EINVAL;
 		}
