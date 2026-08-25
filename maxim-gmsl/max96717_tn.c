@@ -35,14 +35,16 @@
 #define MAX96717_TX3_TX_STR_SEL						GENMASK(1, 0)
 
 #define MAX96717_VIDEO_TX0(p)						(0x100 + (p) * 0x8)
+#define MAX96717_VIDEO_TX0_CLKDET_BYP				BIT(2)
 #define MAX96717_VIDEO_TX0_AUTO_BPP					BIT(3)
+#define MAX96717_VIDEO_TX0_LINE_CRC_EN				BIT(6)
 
 #define MAX96717_VIDEO_TX1(p)						(0x101 + (p) * 0x8)
 #define MAX96717_VIDEO_TX1_BPP						GENMASK(5, 0)
 
 #define MAX96717_VIDEO_TX2(p)						(0x102 + (p) * 0x8)
-#define MAX96717_VIDEO_TX2_PCLKDET					BIT(7)
 #define MAX96717_VIDEO_TX2_DRIFT_DET_EN				BIT(1)
+#define MAX96717_VIDEO_TX2_PCLKDET					BIT(7)
 
 #define MAX96717_GPIO_A(x)							(0x2be + (x) * 0x3)
 #define MAX96717_GPIO_A_GPIO_OUT_DIS				BIT(0)
@@ -1021,6 +1023,7 @@ static int max96717_init_lane_config(struct max96717_priv *priv)
 static int max96717_init(struct max_ser_priv *ser_priv)
 {
 	struct max96717_priv *priv = ser_to_priv(ser_priv);
+	unsigned int index = max96717_pipe_id(priv, &ser_priv->pipes[0]);
 	int ret;
 
 	dev_dbg(priv->dev, "%s()\n", __func__);
@@ -1048,10 +1051,17 @@ static int max96717_init(struct max_ser_priv *ser_priv)
 		return ret;
 
 	if (priv->info->supports_tunnel_mode) {
+		if (ser_priv->tunnel_mode) {
+			ret = max96717_update_bits(priv, MAX96717_VIDEO_TX0(index),
+					   MAX96717_VIDEO_TX0_CLKDET_BYP,
+					   MAX96717_VIDEO_TX0_CLKDET_BYP);
+			if (ret)
+				return ret;
+		}
 
 		ret = max96717_update_bits(priv, MAX96717_EXT11,
 					   MAX96717_EXT11_TUN_MODE,
-				   	   field_prep(MAX96717_EXT11_TUN_MODE,
+					   field_prep(MAX96717_EXT11_TUN_MODE,
 					    	ser_priv->tunnel_mode));
 		if (ret)
 			return ret;
